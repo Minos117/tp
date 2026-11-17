@@ -1,5 +1,5 @@
 {
- "version": "0.9.0",
+ "version": "1.0.0",
  "setup_rev": 1,
  "notes": "Beta 0.9.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": []
