@@ -1099,7 +1099,7 @@ class App(tk.Tk):
         cl.bind("<Button-1>", lambda e: m.tk_popup(cl.winfo_rootx() + 20, cl.winfo_rooty() + 40))
         self.navbtn["settings"] = self.side_btn("ตั้งค่า", lambda: self.nav("settings"))
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
-        tk.Label(self.side, text="รุ่น %s (Beta)" % APP_VER, bg=NAVY, fg="#8FA0C4", font=(f, 10)).pack(side="bottom", pady=12)
+        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=NAVY, fg="#8FA0C4", font=(f, 10)).pack(side="bottom", pady=12)
 
     def side_btn(self, text, cmd):
         b = tk.Label(self.side, text=text, bg=NAVY, fg="#E6ECFA", font=(self.ui_font, 12), anchor="w", padx=22, pady=11, cursor="hand2")
