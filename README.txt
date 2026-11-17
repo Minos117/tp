@@ -1,11 +1,11 @@
-ZAIA Prepare Personal  1.0.0 (Stable)
+ZAIA Prepare Personal  1.0.2 (Stable)
 ==============================================
 สร้างเป็นโปรแกรม Windows + ไฟล์ Setup:
   1) แตก ZIP นี้ไว้ที่ใดก็ได้ (พาธไม่ควรมีอักขระแปลก)
   2) ดับเบิลคลิก build_all.bat  (ต้องต่ออินเทอร์เน็ต)
      - ติดตั้ง Python 3.12 (ถ้าไม่มี, ผ่าน winget -> ปิดหน้าต่างแล้วรันซ้ำ) + แพ็กเกจ (openpyxl, lxml, pillow, pywin32, pyinstaller)
      - สร้าง exe ด้วย PyInstaller -> dist\ZAIA Prepare Personal\
-     - ติดตั้ง/ใช้ Inno Setup 6 สร้าง Setup -> Output\ZAIA_Prepare_Personal_Setup_1.0.0.exe
+     - ติดตั้ง/ใช้ Inno Setup 6 สร้าง Setup -> Output\ZAIA_Prepare_Personal_Setup_1.0.2.exe
      - สร้าง release\update.json (SHA-256) สำหรับระบบอัปเดต
   3) รัน Setup ติดตั้ง (ติดตั้งแบบผู้ใช้ ไม่ต้องสิทธิ์ผู้ดูแล)
 

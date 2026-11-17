@@ -3,13 +3,13 @@
 [Setup]
 AppId={{B4F0C2A1-6C0E-4C9B-9B1E-5A1D7E2F0A11}
 AppName=ZAIA Prepare Personal
-AppVersion=1.0.0
+AppVersion=1.0.2
 AppPublisher=ZAIA
 DefaultDirName={autopf}\ZAIA Prepare Personal
 DefaultGroupName=ZAIA Prepare Personal
 PrivilegesRequired=lowest
 OutputDir=Output
-OutputBaseFilename=ZAIA_Prepare_Personal_Setup_1.0.0
+OutputBaseFilename=ZAIA_Prepare_Personal_Setup_1.0.2
 SetupIconFile=assets\logo.ico
 Compression=lzma2
 SolidCompression=yes
@@ -30,4 +30,5 @@ Name: "{autodesktop}\ZAIA Prepare Personal"; Filename: "{app}\ZAIA Prepare Perso
 Name: "desktopicon"; Description: "Create a desktop shortcut"
 
 [Run]
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden skipifdoesntexist
 Filename: "{app}\ZAIA Prepare Personal.exe"; Description: "Launch ZAIA Prepare Personal"; Flags: nowait postinstall skipifsilent
