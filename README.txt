@@ -20,3 +20,9 @@ ZAIA Prepare Personal  Beta 0.9.0  (ไม่มีโลโก้)
 ยังไม่เคยทดสอบบน Windows จริง: การพิมพ์ GDI, build_all.bat, PyInstaller, Inno Setup, ตัวอัปเดตกับ GitHub จริง
 รองรับนำเข้า .xlsx/.xlsm/.xlsb  (.xlsb เขียนกลับไม่ได้ -> สร้าง .xlsx ใหม่ ค่าล้วน)
 โลโก้: assets\logo.png / logo.ico (วาดขึ้นใหม่ ใช้เป็นไอคอน exe และ Setup)
+
+กติกาอัปเดต (ห้ามแตะ เพื่อให้รุ่น 0.9.0 อัปเดตได้ตลอด):
+  - UPDATE_BASE = https://raw.githubusercontent.com/Minos117/tp/main/  (update.json อยู่ราก repo, ไฟล์อยู่ files/)
+  - update.json คงโครง version, setup_rev, files[path,url,sha256,size] เสมอ (เพิ่มคีย์ใหม่ได้ ห้ามลบ/เปลี่ยนชื่อ)
+  - ตัวอัปเดตเทียบ hash ทุกไฟล์ จึงข้ามรุ่นได้ไม่จำกัด; setup_rev เป็นแค่คำแนะนำ ไม่บล็อกการอัปเดต
+  - ทุกรุ่นถัดไปต้องมี zaia\updater.py ที่ใช้ manifest รูปแบบเดิมได้
