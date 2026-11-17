@@ -26,3 +26,5 @@ ZAIA Prepare Personal  1.0.0 (Stable)
   - update.json คงโครง version, setup_rev, files[path,url,sha256,size] เสมอ (เพิ่มคีย์ใหม่ได้ ห้ามลบ/เปลี่ยนชื่อ)
   - ตัวอัปเดตเทียบ hash ทุกไฟล์ จึงข้ามรุ่นได้ไม่จำกัด; setup_rev เป็นแค่คำแนะนำ ไม่บล็อกการอัปเดต
   - ทุกรุ่นถัดไปต้องมี zaia\updater.py ที่ใช้ manifest รูปแบบเดิมได้
+
+ปล่อยรุ่นใหม่: แก้เลขรุ่น (version.py + installer.iss) -> build_all.bat -> UploadRelease.bat (อัป release\update.json + files\ ขึ้น GitHub; ห้ามแก้ update.json ด้วยมือ)
