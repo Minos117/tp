@@ -16,16 +16,18 @@ SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
 UninstallDisplayName=ZAIA Prepare Personal
+UninstallDisplayIcon={app}\logo.ico
 
 [Files]
 Source: "dist\ZAIA Prepare Personal\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "assets\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\ZAIA Prepare Personal"; Filename: "{app}\ZAIA Prepare Personal.exe"
-Name: "{autodesktop}\ZAIA Prepare Personal"; Filename: "{app}\ZAIA Prepare Personal.exe"; Tasks: desktopicon
+Name: "{autoprograms}\ZAIA Prepare Personal"; Filename: "{app}\ZAIA Prepare Personal.exe"; IconFilename: "{app}\logo.ico"
+Name: "{autodesktop}\ZAIA Prepare Personal"; Filename: "{app}\ZAIA Prepare Personal.exe"; IconFilename: "{app}\logo.ico"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a desktop shortcut"
 
 [Run]
 Filename: "{app}\ZAIA Prepare Personal.exe"; Description: "Launch ZAIA Prepare Personal"; Flags: nowait postinstall skipifsilent
