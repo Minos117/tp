@@ -927,6 +927,7 @@ class HomePage(Page):
         src = db.source.get("path", "")
         tk.Label(self, bg=BG, fg=MUTED, font=(fam, 11), anchor="w",
                  text=("ไฟล์ข้อมูล: %s  [%s]" % (src, db.source.get("sheet", ""))) if n else "ยังไม่มีข้อมูล — เริ่มที่ขั้นตอน 1 นำเข้าข้อมูลจากไฟล์ Excel").pack(fill="x")
+        self._progress_table(db, fam)
         tk.Label(self, text="เลือกขั้นตอน", bg=BG, fg=NAVY, font=(fam, 15, "bold"), anchor="w").pack(fill="x", pady=(18, 8))
         grid = tk.Frame(self, bg=BG)
         grid.pack(fill="both", expand=True)
@@ -938,6 +939,52 @@ class HomePage(Page):
         for i, (num, t, d, key, col) in enumerate(items):
             grid.columnconfigure(i % 2, weight=1, uniform="c")
             Card(grid, num, t, d, lambda k=key: app.nav(k), col).grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
+
+
+def _progress_table(self, db, fam):
+    """ตารางความคืบหน้า: ประเภททหาร > ตำบล > หมู่ (ดับเบิลคลิกที่แถวเพื่อกางหรือหุบ)"""
+    if not db.persons:
+        return
+    box = tk.Frame(self, bg=BG)
+    box.pack(fill="x", pady=(12, 0))
+    tk.Label(box, text="ความคืบหน้าแยกประเภท / ตำบล / หมู่", bg=BG, fg=NAVY, font=(fam, 13, "bold"), anchor="w").pack(fill="x")
+    cols = ("all", "done", "left", "pct")
+    tv = ttk.Treeview(box, columns=cols, height=7, selectmode="browse")
+    tv.heading("#0", text="ประเภท / ตำบล / หมู่")
+    for c, t, w in (("all", "ทั้งหมด", 90), ("done", "ดำเนินการแล้ว", 120), ("left", "ยังไม่ดำเนินการ (คงเหลือ)", 190), ("pct", "ร้อยละ", 80)):
+        tv.heading(c, text=t)
+        tv.column(c, width=w, anchor="e")
+    tv.column("#0", width=300)
+    tv.tag_configure("ptype", background="#E8EEFB", font=(fam, 11, "bold"))
+    tv.tag_configure("tam", background="#F6F8FC")
+    tv.tag_configure("zero", foreground="#B42318")
+    sb = ttk.Scrollbar(box, command=tv.yview)
+    tv.configure(yscrollcommand=sb.set)
+    tv.pack(side="left", fill="x", expand=True)
+    sb.pack(side="left", fill="y")
+
+    def row(parent, text, a, d, tags):
+        pc = "%d%%" % round(100 * d / a) if a else "-"
+        return tv.insert(parent, "end", text=text, values=(a, d, a - d, pc), tags=tags + (("zero",) if a - d else ()), open=False)
+    T = [0, 0]
+    for t, a, d, tams in db.summary():
+        it = row("", t, a, d, ("ptype",))
+        T[0] += a
+        T[1] += d
+        for tb, a2, d2, moos in tams:
+            it2 = row(it, "ต." + tb, a2, d2, ("tam",))
+            for m, a3, d3 in moos:
+                row(it2, "หมู่ " + m, a3, d3, ())
+    row("", "รวมทั้งหมด", T[0], T[1], ("ptype",))
+
+    def toggle(e):
+        i = tv.identify_row(e.y)
+        if i:
+            tv.item(i, open=not tv.item(i, "open"))
+    tv.bind("<Double-1>", toggle)
+
+
+HomePage._progress_table = _progress_table
 
 
 class App(tk.Tk):

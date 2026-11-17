@@ -180,6 +180,25 @@ class DB:
     def filled(self, p):
         return bool(p.get("result"))
 
+    def summary(self, by="tambon"):
+        """สรุปรายประเภท: [(ประเภท, ทั้งหมด, ทำแล้ว, [(ตำบล, ทั้งหมด, ทำแล้ว, [(หมู่, ทั้งหมด, ทำแล้ว)])])]  ทำแล้ว = บันทึกผลแล้ว"""
+        tam_order = {t: i for i, t in enumerate(self.tambons())}
+        tree = {}
+        for p in self.persons:
+            t, tb, mo = guess_type(p) or "ไม่ระบุ", p["tambon"] or "-", str(p["moo"] or "-")
+            d = 1 if self.filled(p) else 0
+            tree.setdefault(t, {}).setdefault(tb, {}).setdefault(mo, [0, 0])
+            tree[t][tb][mo][0] += 1
+            tree[t][tb][mo][1] += d
+        out = []
+        for t in sorted(tree, key=type_rank):
+            tams = []
+            for tb in sorted(tree[t], key=lambda x: tam_order.get(x, 999)):
+                moos = [(m, v[0], v[1]) for m, v in sorted(tree[t][tb].items(), key=lambda kv: moo_key(kv[0]))]
+                tams.append((tb, sum(m[1] for m in moos), sum(m[2] for m in moos), moos))
+            out.append((t, sum(x[1] for x in tams), sum(x[2] for x in tams), tams))
+        return out
+
     # ---- เลือก/เรียง
     def select(self, ptype=ALL_TYPES, tambon=ALL_TAMBON, moo=None, only_unprinted=None):
         """คืนรายการคน เรียง: ประเภท(สัญญาบัตร→ประทวน→พลฯ) แล้วหมู่น้อย→มาก (ตำบลเรียงตามลำดับที่พบ)"""
