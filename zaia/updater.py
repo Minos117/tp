@@ -111,3 +111,54 @@ def finish_pending(pend, exe=None):
     with open(path, "w", encoding="mbcs" if os.name == "nt" else "utf-8") as f:   # mbcs = codepage ของเครื่อง (รองรับพาธไทย)
         f.write("\r\n".join(lines) + "\r\n")
     subprocess.Popen(["cmd", "/c", path], creationflags=0x08000000)
+
+
+# ================= แพตช์โค้ด (.py) ออนไลน์: ไม่ต้อง build exe ใหม่ =================
+def patch_dir():
+    from .core import data_dir
+    return os.path.join(data_dir(), "patch")
+
+
+def has_patch(m):
+    p = m.get("patch")
+    return bool(p and p.get("files") and vtuple(p.get("version", "0")) > vtuple(APP_VER))
+
+
+def apply_patch(m, base, progress=lambda s: None):
+    """ดาวน์โหลดไฟล์แพตช์ทั้งชุด ตรวจ SHA-256 ครบก่อน แล้วสลับโฟลเดอร์ patch ทีเดียว (ผิดพลาด = ไม่แตะของเดิม)"""
+    if not base.endswith("/"):
+        base += "/"
+    p = m["patch"]
+    dst = patch_dir()
+    new, old = dst + ".new", dst + ".old"
+    shutil.rmtree(new, ignore_errors=True)
+    os.makedirs(new)
+    try:
+        for f in p["files"]:
+            progress("ดาวน์โหลด " + f["path"])
+            data = _get(base + urllib.parse.quote(f.get("url", f["path"]), safe="/"), timeout=120)
+            if hashlib.sha256(data).hexdigest() != f["sha256"].lower():
+                raise ValueError("SHA-256 ไม่ตรงกับ update.json: " + f["path"])
+            t = os.path.join(new, *f["path"].split("/"))
+            os.makedirs(os.path.dirname(t), exist_ok=True)
+            with open(t, "wb") as fh:
+                fh.write(data)
+        with open(os.path.join(new, "patch.json"), "w", encoding="utf-8") as fh:
+            json.dump({"version": p["version"], "files": len(p["files"])}, fh)
+    except Exception:
+        shutil.rmtree(new, ignore_errors=True)
+        raise
+    shutil.rmtree(old, ignore_errors=True)
+    if os.path.exists(dst):
+        os.replace(dst, old)
+    os.replace(new, dst)
+    shutil.rmtree(old, ignore_errors=True)
+    return len(p["files"])
+
+
+def restart():
+    """เปิดโปรแกรมใหม่ (หลังติดตั้งแพตช์) — ผู้เรียกต้องปิดหน้าต่างเดิมเอง"""
+    if getattr(sys, "frozen", False):
+        subprocess.Popen([sys.executable])
+    else:
+        subprocess.Popen([sys.executable, os.path.join(app_dir(), "app.py")])

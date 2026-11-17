@@ -28,3 +28,8 @@ ZAIA Prepare Personal  1.0.2 (Stable)
   - ทุกรุ่นถัดไปต้องมี zaia\updater.py ที่ใช้ manifest รูปแบบเดิมได้
 
 ปล่อยรุ่นใหม่: แก้เลขรุ่น (version.py + installer.iss) -> build_all.bat -> UploadRelease.bat (อัป release\update.json + files\ ขึ้น GitHub; ห้ามแก้ update.json ด้วยมือ)
+
+อัปเดตออนไลน์แบบแพตช์ (ไม่ต้อง build exe): exe โหลดโค้ด .py จากโฟลเดอร์แพตช์ %APPDATA%\ZAIA Prepare Personal\patch ถ้าใหม่กว่า
+  แก้โค้ด -> เพิ่ม APP_VER ใน zaia\version.py -> python MakePatch.py (อัปเดตส่วน patch ใน update.json) -> อัปซอร์ส + update.json ขึ้น GitHub
+  เครื่องผู้ใช้: ตรวจสอบอัปเดต -> ดาวน์โหลดและอัปเดต (ตรวจ SHA-256 ครบก่อนใช้ ถ้าแพตช์พัง โปรแกรมถอยไปใช้โค้ดเดิมเอง)
+  ต้องติดตั้ง Setup รุ่นนี้ (1.0.2+) ครั้งเดียวก่อน; ถ้าแพตช์ใช้ไลบรารีใหม่ที่ exe ไม่มี ต้อง build + ติดตั้ง Setup ใหม่

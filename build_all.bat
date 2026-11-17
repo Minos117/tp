@@ -67,6 +67,7 @@ echo [5/6] Building setup with Inno Setup...
 rem ---- 6) update.json (SHA-256)
 echo [6/6] Creating release\update.json ...
 "%VPY%" MakeRelease.py || goto :fail
+"%VPY%" MakePatch.py release\update.json || goto :fail
 
 echo.
 echo ============================================================

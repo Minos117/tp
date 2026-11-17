@@ -854,6 +854,14 @@ class UpdateWin(Page):
         except Exception as e:
             return self.put("ผิดพลาด: %s\n\nวางลิงก์ใหม่ในช่องด้านบนแล้วกด ตรวจสอบ อีกครั้ง" % e)
         m = self.m
+        self.mode = "files"
+        if updater.has_patch(m):        # แพตช์โค้ดออนไลน์ (ไม่ต้องติดตั้ง Setup ใหม่)
+            self.mode = "patch"
+            pv = m["patch"]
+            self.put("มีแพตช์รุ่น %s (ปัจจุบัน %s)\nไฟล์โค้ด %d ไฟล์ จะดาวน์โหลดทั้งชุดและตรวจ SHA-256 ก่อนใช้งาน\n\n%s\n\nหลังอัปเดตโปรแกรมจะเปิดใหม่เอง" % (
+                pv["version"], APP_VER, len(pv["files"]), m.get("notes", "")))
+            self.btn.config(state="normal")
+            return
         if not updater.is_newer(m):
             return self.put("เป็นรุ่นล่าสุดแล้ว (%s)" % APP_VER)
         self.todo = updater.plan(m)      # อัปเดตได้เสมอ ไม่ว่ารุ่นห่างแค่ไหน (เทียบ hash ทุกไฟล์) setup_rev เป็นแค่คำแนะนำ
@@ -865,6 +873,18 @@ class UpdateWin(Page):
         self.btn.config(state="normal" if self.todo else "disabled")
 
     def apply(self):
+        if getattr(self, "mode", "") == "patch":
+            if not messagebox.askyesno("ยืนยัน", "ติดตั้งแพตช์รุ่น %s แล้วเปิดโปรแกรมใหม่?\n(ข้อมูลที่นำเข้าไม่หาย)" % self.m["patch"]["version"]):
+                return
+            try:
+                updater.apply_patch(self.m, self.base, progress=lambda s: (self.put(s), self.update_idletasks()))
+            except Exception as e:
+                return self.put("อัปเดตไม่สำเร็จ: %s\n\nไม่มีไฟล์ใดถูกเปลี่ยน ลองใหม่ได้" % e)
+            self.app.db.save()
+            updater.restart()
+            self.app._closing = True
+            self.app.destroy()
+            return
         if not messagebox.askyesno("ยืนยัน", "อัปเดตไฟล์ %d รายการ? (สำรองไฟล์เดิมเป็น .bak)" % len(self.todo)):
             return
         try:
@@ -1211,7 +1231,9 @@ class App(tk.Tk):
         def run():
             try:
                 m, _ = updater.fetch_manifest(url)
-                if updater.is_newer(m):
+                if updater.has_patch(m):
+                    self._nv = m["patch"]["version"]
+                elif updater.is_newer(m):
                     self._nv = m.get("version")
             except Exception:
                 pass
