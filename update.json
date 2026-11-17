@@ -1,6 +1,13 @@
 {
- "version": "1.0.0",
+ "version": "1.0.1",
  "setup_rev": 1,
- "notes": "Beta 0.9.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
- "files": []
+ "notes": "ทดสอบระบบอัปเดต: ดาวน์โหลดไฟล์ update_test.txt (ไม่กระทบโปรแกรม)",
+ "files": [
+  {
+   "path": "update_test.txt",
+   "url": "files/update_test.txt",
+   "sha256": "44ce423ba19af6c8738f220665736705210861ed670e9454519db2afbb28dd37",
+   "size": 24
+  }
+ ]
 }
