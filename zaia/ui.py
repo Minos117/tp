@@ -858,6 +858,8 @@ class UpdateWin(Page):
             return self.put("เป็นรุ่นล่าสุดแล้ว (%s)" % APP_VER)
         self.todo = updater.plan(m)      # อัปเดตได้เสมอ ไม่ว่ารุ่นห่างแค่ไหน (เทียบ hash ทุกไฟล์) setup_rev เป็นแค่คำแนะนำ
         extra = ("\n\n(แนะนำ: รุ่นนี้มี Setup ใหม่ %s)" % m.get("setup_url", "")) if updater.needs_setup(m) else ""
+        if not self.todo:
+            return self.put("รุ่น %s บน GitHub: ไฟล์ในเครื่องตรงกับรุ่นนี้ครบแล้ว (hash ตรงทุกไฟล์) ไม่มีไฟล์ใหม่ให้ดาวน์โหลด\n\n%s" % (m.get("version"), m.get("notes", "")))
         self.put("มีรุ่นใหม่ %s\nไฟล์ที่จะดาวน์โหลด (%d):\n%s\n\n%s%s" % (
             m.get("version"), len(self.todo), "\n".join(" - %s" % f["path"] for f in self.todo), m.get("notes", ""), extra))
         self.btn.config(state="normal" if self.todo else "disabled")
