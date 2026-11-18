@@ -995,9 +995,7 @@ class RecordWin(Page):
         p = self.cur
         if not p:
             return
-        self.v["place"].set("%s ม.%s ต.%s อ.%s" % (p["house"], p["moo"], p["tambon"], p["amphoe"]))
-        self.v["province"].set(p["province"])
-        self.prov_changed(keep=p["amphoe"])
+        self.v["place"].set("%s ม.%s ต.%s" % (p["house"], p["moo"], p["tambon"]))      # เฉพาะบ้านเลขที่ หมู่ ตำบล (จังหวัด/อำเภอไม่แตะ)
 
     def save(self, nxt):
         p = self.cur
