@@ -1295,9 +1295,9 @@ class UpdateWin(Page):
 
 
 # ====================================================================== หน้าแรก + หน้าต่างหลัก
-NAVY, BG, ACCENT, GREEN, CARD, MUTED = "#1B2A49", "#EEF2F8", "#2F6FED", "#1E9E5A", "#FFFFFF", "#6B7790"
-SIDE, SIDE_HOVER, SIDE_ACT = "#164194", "#2457C5", "#3C9A3C"        # แถบเมนูฟ้าเข้มแบบ XP Luna + ปุ่มเลือกสีเขียว "Start"
-BAR_L, BAR_R = (10, 58, 158), (80, 140, 235)                          # แถบหัวเรื่องไล่สีฟ้า
+NAVY, BG, ACCENT, GREEN, CARD, MUTED = "#0A246A", "#ECE9D8", "#245EDC", "#2E8B2E", "#FFFFFF", "#6B6A5E"      # สี Windows XP (Luna): พื้นครีม + น้ำเงิน + เขียว
+SIDE, SIDE_HOVER, SIDE_ACT = "#245EDC", "#3F78E8", "#3C9A3C"        # แถบเมนูฟ้าเข้มแบบ XP Luna + ปุ่มเลือกสีเขียว "Start"
+BAR_L, BAR_R = (0, 84, 227), (61, 149, 255)                          # แถบหัวเรื่องไล่สีฟ้า
 
 
 class TitleBar(tk.Canvas):
@@ -1335,7 +1335,7 @@ class Card(tk.Frame):
     """การ์ดคลิกได้"""
 
     def __init__(self, parent, num, title, desc, cmd, color=ACCENT):
-        super().__init__(parent, bg=CARD, highlightthickness=2, highlightbackground="#D8DFEC", cursor="hand2")
+        super().__init__(parent, bg=CARD, highlightthickness=2, highlightbackground="#ACA899", cursor="hand2")
         fam = parent.winfo_toplevel().ui_font
         self.badge = tk.Label(self, text=num, bg=color, fg="white", font=(fam, 18, "bold"), width=2)
         self.badge.pack(side="left", fill="y")
@@ -1346,7 +1346,7 @@ class Card(tk.Frame):
         for w in [self, box] + list(box.winfo_children()) + [self.badge]:
             w.bind("<Button-1>", lambda e: cmd())
             w.bind("<Enter>", lambda e: self.config(highlightbackground=color))
-            w.bind("<Leave>", lambda e: self.config(highlightbackground="#D8DFEC"))
+            w.bind("<Leave>", lambda e: self.config(highlightbackground="#ACA899"))
 
 
 class HomePage(Page):
@@ -1387,7 +1387,7 @@ class HomePage(Page):
                  ("รอเขียนกลับ Excel", str(db.dirty_count()), "คน", "#D98A00"), ("พิมพ์บัญชีตรวจสอบแล้ว", str(printed), "คน", ACCENT)]
         for i, (t, v, u, c) in enumerate(stats):
             row.columnconfigure(i, weight=1, uniform="s")
-            f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground="#D8DFEC")
+            f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground="#ACA899")
             f.grid(row=0, column=i, sticky="nsew", padx=(0 if i == 0 else 10, 0))
             tk.Frame(f, bg=c, height=5).pack(fill="x")
             tk.Label(f, text=t, bg=CARD, fg=MUTED, font=(fam, 11)).pack(anchor="w", padx=16, pady=(12, 0))
@@ -1429,8 +1429,8 @@ def _progress_table(self, db, fam):
         tv.heading(c, text=t)
         tv.column(c, width=w, anchor="e")
     tv.column("#0", width=300)
-    tv.tag_configure("ptype", background="#E8EEFB", font=(fam, 11, "bold"))
-    tv.tag_configure("tam", background="#F6F8FC")
+    tv.tag_configure("ptype", background="#D6E3F8", font=(fam, 11, "bold"))
+    tv.tag_configure("tam", background="#F7F5EA")
     tv.tag_configure("zero", foreground="#B42318")
     sb = ttk.Scrollbar(box, command=tv.yview)
     tv.configure(yscrollcommand=sb.set)
@@ -1535,18 +1535,22 @@ class App(tk.Tk):
         st.configure("TLabelframe.Label", background=BG, foreground=NAVY, font=(f, 11, "bold"))
         for w in ("TCheckbutton", "TRadiobutton"):
             st.configure(w, background=BG, font=(f, 11))
-        st.configure("TButton", padding=(14, 8), font=(f, 11), background="#DCE3F0", relief="flat")
-        st.map("TButton", background=[("active", "#C9D4EA")])
-        st.configure("Accent.TButton", padding=(16, 9), font=(f, 11, "bold"), background=ACCENT, foreground="white")
-        st.map("Accent.TButton", background=[("active", "#1F55C4")])
+        st.configure("TButton", padding=(14, 8), font=(f, 11), background="#F4F2E6", foreground="#000000", bordercolor="#003C74",
+                     lightcolor="#FFFFFF", darkcolor="#CFCBB8", relief="raised")
+        st.map("TButton", background=[("active", "#FFF3C4"), ("pressed", "#E3DFC9")], bordercolor=[("active", "#E5A100")])
+        st.configure("Accent.TButton", padding=(16, 9), font=(f, 11, "bold"), background="#3C9A3C", foreground="white", bordercolor="#1E5E1E",
+                     lightcolor="#7FD07F", darkcolor="#2A7A2A", relief="raised")
+        st.map("Accent.TButton", background=[("active", "#4CB04C"), ("pressed", "#2A7A2A")])
         st.configure("TEntry", padding=6, fieldbackground="white")
         st.configure("TCombobox", padding=6, fieldbackground="white")
         st.configure("TSpinbox", padding=5, fieldbackground="white")
         st.configure("Treeview", rowheight=28, font=(f, 11), fieldbackground="white")
-        st.configure("Treeview.Heading", font=(f, 11, "bold"), padding=6)
-        st.configure("TNotebook", background=BG)
-        st.configure("TNotebook.Tab", padding=(16, 8), font=(f, 11))
-        st.configure("Green.Horizontal.TProgressbar", troughcolor="#D8DFEC", background=GREEN, thickness=10)
+        st.configure("Treeview.Heading", font=(f, 11, "bold"), padding=6, background="#E4E0CC", bordercolor="#ACA899")
+        st.map("Treeview", background=[("selected", "#316AC5")], foreground=[("selected", "white")])
+        st.configure("TNotebook", background=BG, bordercolor="#919B9C")
+        st.configure("TNotebook.Tab", padding=(16, 8), font=(f, 11), background="#E4E0CC")
+        st.map("TNotebook.Tab", background=[("selected", "#FFFFFF")])
+        st.configure("Green.Horizontal.TProgressbar", troughcolor="#D6D2C2", background=GREEN, thickness=10)
 
     def build_side(self):
         f = self.ui_font
@@ -1560,7 +1564,7 @@ class App(tk.Tk):
                          ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
                          ("sum", "6  บัญชีสรุปผลการตรวจสอบ")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
-        tk.Frame(self.side, bg="#5E86D6", height=1).pack(fill="x", padx=18, pady=14)
+        tk.Frame(self.side, bg="#8FB0F0", height=1).pack(fill="x", padx=18, pady=14)
         self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
         cl = self.side_btn("ล้างข้อมูล  ▾", None)
         m = tk.Menu(self, tearoff=0)
@@ -1571,7 +1575,7 @@ class App(tk.Tk):
         cl.bind("<Button-1>", lambda e: m.tk_popup(cl.winfo_rootx() + 20, cl.winfo_rooty() + 40))
         self.navbtn["settings"] = self.side_btn("ตั้งค่า", lambda: self.nav("settings"))
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
-        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=SIDE, fg="#A9C0F0", font=(f, 10)).pack(side="bottom", pady=12)
+        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=SIDE, fg="#CFE0FF", font=(f, 10)).pack(side="bottom", pady=12)
 
     def side_btn(self, text, cmd):
         b = tk.Label(self.side, text=text, bg=SIDE, fg="#EAF1FF", font=(self.ui_font, 12), anchor="w", padx=22, pady=11, cursor="hand2")
