@@ -348,27 +348,32 @@ def build_form(ctx):
     for w in cw:
         xs.append(xs[-1] + w)
     Lh = 23.25 * PT * s
-    P = lambda pt: pt * s
+    PTS = 16                                    # TH SarabunIT๙ 16 pt ทั้งฟอร์ม
     year = st.get("year", "2570")
     pages = []
     for n, p in enumerate(ctx.persons, 1):
         pg = Page(g["w"], g["h"])
         top = g["mt"]
 
-        def Y(r):
-            return top + (r - 1) * Lh + (0.13 * Lh if r > 1 else 0)
+        def Y(r):                               # แถว 1 (ลำดับที่) ตัดออกแล้ว -> เริ่มที่แถว 2
+            return top + (r - 2) * Lh
 
-        def lab(c1, c2, r, text, al="l", pt=18, bold=True, u=False):
-            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, P(pt), "u" if (u and bold) else bold, "f%d" % pt)
+        def lab(c1, c2, r, text, al="l", bold=True, u=False):
+            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, PTS, "u" if (u and bold) else bold, "f")
 
-        def val(c1, c2, r, text="", al="c", pt=18, bold=False, line=True):
+        def val(c1, c2, r, text="", al="c", bold=False, line=True):
             if line:
                 _ln(pg, xs[c1], Y(r) + Lh, xs[c2 + 1], Y(r) + Lh, 0.2, True)
-            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, P(pt), bold, "v%d" % pt)
+            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, PTS, bold, "v")
+
+        def box(c, r, text, dx=0.0):            # ช่องสี่เหลี่ยมให้ติ๊ก + ข้อความ
+            sz = 4.3
+            bx, by = xs[c] + 1.5 + dx, Y(r) + (Lh - sz) / 2
+            for x1, y1, x2, y2 in ((bx, by, bx + sz, by), (bx + sz, by, bx + sz, by + sz), (bx + sz, by + sz, bx, by + sz), (bx, by + sz, bx, by)):
+                _ln(pg, x1, y1, x2, y2, 0.35)
+            _t(pg, bx + sz + 0.8, Y(r), 30, Lh, text, "l", PTS, True, "f")
 
         am, pv = _p(p, "amphoe") or st.get("amphoe", ""), _p(p, "province") or st.get("province", "")
-        lab(12, 12, 1, "ลำดับที่", "r")
-        val(13, 14, 1, str(n), "c", 20, True)
         lab(0, 14, 2, "รายละเอียดการตรวจสอบสภาพทหารกองหนุน ประจำปี %s" % year, "c")
         lab(0, 14, 3, "อำเภอ%s   จังหวัด%s" % (am, pv), "c")
         lab(0, 14, 4, "สัสดีอำเภอ%s โทร %s" % (am, st.get("sad_tel", "")), "c")
@@ -377,37 +382,37 @@ def build_form(ctx):
         lab(8, 8, 5, "สกุล", "c"); val(9, 12, 5, _p(p, "surname"), bold=True)
         lab(1, 3, 6, "เครื่องหมาย", "r"); val(4, 9, 6, ("%s %s" % (_p(p, "year"), _p(p, "mark"))).strip(), bold=True)
         lab(10, 10, 6, "เหล่า"); val(11, 13, 6, _p(p, "branch"))
-        lab(1, 5, 7, "หมายเลขประจำตัวประชาชน", "r", 18, False); val(6, 11, 7, _p(p, "nid"))
-        lab(1, 2, 8, "บิดาชื่อ", "r", 18, False); val(3, 6, 8, (_p(p, "father") + " " + _p(p, "fsur")).strip())
+        lab(1, 5, 7, "หมายเลขประจำตัวประชาชน", "r", False); val(6, 11, 7, _p(p, "nid"))
+        lab(1, 2, 8, "บิดาชื่อ", "r", False); val(3, 6, 8, (_p(p, "father") + " " + _p(p, "fsur")).strip())
         lab(7, 8, 8, "มารดาชื่อ", "r"); val(9, 12, 8, (_p(p, "mother") + " " + _p(p, "msur")).strip())
         lab(1, 5, 9, "2. ภูมิลำเนาทหารอยู่บ้านเลขที่"); val(6, 7, 9, _p(p, "house"))
         lab(8, 8, 9, "หมู่ที่", "c"); val(9, 9, 9, _p(p, "moo"))
         lab(10, 10, 9, "ตำบล", "c"); val(11, 13, 9, _p(p, "tambon"))
-        lab(1, 2, 10, "อำเภอ", "r", 18, False); val(3, 6, 10, am)
+        lab(1, 2, 10, "อำเภอ", "r", False); val(3, 6, 10, am)
         lab(7, 8, 10, "จังหวัด", "c"); val(9, 12, 10, pv)
         lab(1, 14, 11, "3  สถานภาพปัจจุบัน ทำเครื่องหมาย / และระบุสถานที่ปัจจุบัน (ให้ระบุ 1 ข้อ)")
 
         def addr(r):
-            lab(5, 5, r, "อำเภอ", "l", 16); val(6, 8, r)
-            lab(9, 9, r, "จังหวัด", "l", 16); val(10, 12, r)
-            lab(13, 13, r, "รหัสไปรษณีย์", "c", 16); val(14, 14, r)
+            lab(5, 5, r, "อำเภอ", "l"); val(6, 8, r)
+            lab(9, 9, r, "จังหวัด", "l"); val(10, 12, r)
+            lab(13, 13, r, "รหัสไปรษณีย์", "c"); val(14, 14, r)
 
-        lab(0, 1, 12, " *ทำงาน", "l"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
-        lab(0, 4, 13, "    - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", 14); addr(13)
-        lab(0, 3, 14, "     *ศึกษา", "l"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
+        box(0, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
+        lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False); addr(13)
+        box(0, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
         lab(9, 9, 14, "คณะ", "c"); val(10, 12, 14); lab(12, 13, 14, "ชั้นปีที่", "r"); val(14, 14, 14)
         addr(15)
-        lab(0, 3, 16, "   *ว่างงาน", "l"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
+        box(0, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
         addr(17)
-        lab(0, 3, 18, "       *อื่นๆ", "l"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
-        lab(1, 3, 19, " - เช่น ตาย", "l", 16); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
+        box(0, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
+        lab(0, 3, 19, "     - เช่น ตาย", "l", False); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
         lab(1, 14, 20, "4  เบอร์โทรศัพท์ที่สามารถติดต่อได้ (กรณีกองทัพบกเรียกพลฯ เพื่อฝึกหรือเพื่อตรวจสอบ)")
-        for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา  ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
-            lab(2, 6, r, tx, "r"); val(7, 12, r); lab(7, 7, r, "*", "l", 18, False); lab(13, 13, r, "โปรดระบุ", "l", 18, False)
-        lab(1, 14, 24, "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ%s ภายในวันที่ %s" % (am, st.get("deadline", "")), "l", 18, True, True)
-        lab(5, 13, 25, "ขอรับรองว่าได้ตรวจสอบข้อมูลจากทหารกองหนุนจริง", "l", 18, False)
-        lab(5, 5, 26, "(ลงชื่อ)"); val(6, 10, 26); lab(11, 14, 26, "ผู้ใหญ่บ้าน", "l", 18, False)
-        lab(6, 14, 27, "(.....................................................)", "l", 18, False)
+        for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
+            lab(1, 6, r, tx, "r"); val(7, 12, r); lab(13, 13, r, "โปรดระบุ", "l", False)
+        lab(1, 14, 24, "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ%s ภายในวันที่ %s" % (am, st.get("deadline", "")), "l", True, True)
+        lab(5, 13, 25, "ขอรับรองว่าได้ตรวจสอบข้อมูลจากทหารกองหนุนจริง", "l", False)
+        lab(5, 5, 26, "(ลงชื่อ)"); val(6, 10, 26); lab(11, 14, 26, "ผู้ใหญ่บ้าน", "l", False)
+        lab(6, 14, 27, "(.....................................................)", "l", False)
         lab(1, 14, 29, "หมายเหตุ  ตามพระราชบัญญัติรับราชการทหาร พ.ศ.2497  มาตรา 47  ทหารกองเกินและ")
         lab(2, 14, 30, "ทหารกองหนุนผู้ใด ไม่มาเข้ารับการเรียกพลเพื่อตรวจสอบ ตามมาตรา 36 ต้องระวางโทษ")
         lab(2, 14, 31, "ทั้งจำคุกและปรับ")
@@ -427,19 +432,28 @@ def build_env(ctx):
     snd = [x for x in snd if x]
     if st.get("unit_name", "หน่วยสัสดีอำเภอ") == "หน่วยสัสดีอำเภอ":
         snd[0] = "หน่วยสัสดีอำเภอ%s" % ua
+    gr = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "garuda.png")
+    if not os.path.exists(gr):
+        gr = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "garuda.png")
     for p in ctx.persons:
         pg = Page(g["w"], g["h"])
+        sx = 10
+        if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน (ตามเทมเพลต) ข้อความผู้ส่งอยู่ถัดไปทางขวา
+            pg.ops.append(("img", gr, 10, 8, 17.5, 17.5 * 199 / 253))
+            sx = 30
         for i, tx in enumerate(snd):
-            _t(pg, 10, 8 + i * 6.2, 90, 6.2, tx, "l", 15, i == 0, "s")
+            _t(pg, sx, 8 + i * 6.4, 100, 6.4, tx, "l", 16, False, "s")
         if st.get("env_no"):
-            _t(pg, 10, 40, 90, 7, "ที่  %s" % st["env_no"], "l", 15, False, "n")
+            _t(pg, 10, 40, 90, 7, "ที่  %s" % st["env_no"], "l", 16, False, "n")
         am, pv = _p(p, "amphoe") or st.get("amphoe", ""), _p(p, "province") or st.get("province", "")
         z = core.zip_lookup(pv, am, _p(p, "tambon"))
-        rc = [("เรียน  %s %s  %s" % (_p(p, "rank"), _p(p, "name"), _p(p, "surname"))).replace("  ", " ").strip(),
-              "บ้านเลขที่ %s หมู่ที่ %s ตำบล%s" % (_p(p, "house"), _p(p, "moo"), _p(p, "tambon")),
-              "อำเภอ%s จังหวัด%s" % (am, pv), z]
-        for i, tx in enumerate(rc):
-            _t(pg, 82, 55 + i * 8.5, 128, 8.5, tx, "l", 18 if i < 3 else 20, i == 0 or i == 3, "r%d" % (i == 3))
+        name = ("%s %s  %s" % (_p(p, "rank"), _p(p, "name"), _p(p, "surname"))).replace("  ", " ").strip()
+        rx, ry, rh = 92, 54, 9.5                                  # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
+        _t(pg, rx, ry, 16, rh, "เรียน", "l", 18, False, "e")
+        rows = [name, "บ้านเลขที่ %s หมู่ที่ %s ตำบล%s" % (_p(p, "house"), _p(p, "moo"), _p(p, "tambon")),
+                "อำเภอ%s จังหวัด%s" % (am, pv), z]
+        for i, tx in enumerate(rows):
+            _t(pg, rx + 16, ry + i * rh, 105, rh, tx, "l", 18, False, "r%d" % (i == 3))
         pages.append(pg)
     return pages
 

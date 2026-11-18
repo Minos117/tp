@@ -143,7 +143,7 @@ class SettingsWin(Page):
         sc3.pack(fill="both", expand=True)
         f3 = ttk.Frame(sc3.inner, padding=16)
         f3.pack(fill="both", expand=True)
-        ttk.Label(f3, text="กรอกครั้งเดียว โปรแกรมดึงไปใส่แบบพิมพ์รายบุคคลและซองจดหมายให้ทุกใบ (เมนู 6)", foreground="#555").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        ttk.Label(f3, text="กรอกครั้งเดียว โปรแกรมดึงไปใส่แบบพิมพ์รายบุคคลและซองจดหมายให้ทุกใบ (เมนู 2)", foreground="#555").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
         rows3 = [("unit_name", "ชื่อหน่วย (ผู้ส่งบนซอง)"), ("unit_addr", "ที่ตั้ง/บรรทัดที่อยู่ (เช่น ที่ว่าการอำเภอ)"),
                  ("unit_amphoe", "อำเภอของหน่วย (ว่าง = ใช้อำเภอสำรอง)"), ("unit_province", "จังหวัดของหน่วย (ว่าง = ใช้จังหวัดสำรอง)"),
                  ("unit_zip", "รหัสไปรษณีย์หน่วย (ว่าง = คิดให้อัตโนมัติ)"), ("sad_tel", "เบอร์โทรสัสดีอำเภอ (พิมพ์บนแบบพิมพ์)"),
@@ -152,6 +152,9 @@ class SettingsWin(Page):
             ttk.Label(f3, text=lab).grid(row=i, column=0, sticky="w", pady=5)
             self.v[k] = tk.StringVar(value=str(st.get(k, "")))
             ttk.Entry(f3, textvariable=self.v[k], width=46).grid(row=i, column=1, pady=5, padx=8, sticky="w")
+        self.env_rot = tk.BooleanVar(value=bool(st.get("env_rot", True)))
+        ttk.Checkbutton(f3, text="ซองป้อนแนวตั้ง (ตั้งไดรเวอร์เป็นแนวตั้ง และหมุนข้อความ 90° ให้อ่านตามด้านยาวซอง)", variable=self.env_rot).grid(
+            row=len(rows3) + 3, column=0, columnspan=2, sticky="w", pady=6)
         self.zipmsg = ttk.Label(f3, text="")
         ttk.Button(f3, text="คิดรหัสไปรษณีย์จากอำเภอ/จังหวัดของหน่วย", command=self.guess_zip).grid(row=len(rows3) + 1, column=1, sticky="w", pady=6, padx=8)
         self.zipmsg.grid(row=len(rows3) + 2, column=1, sticky="w", padx=8)
@@ -296,6 +299,7 @@ class SettingsWin(Page):
         for lv, k in self.keys.items():
             st[k] = self.lines[lv]
         st["backup"] = self.backup.get()
+        st["env_rot"] = self.env_rot.get()
         st["sig_image"], st["sig_level"] = self.sig_path.get(), self.sig_level.get()
         st["sig_w"], st["sig_dx"], st["sig_dy"] = round(self.sig_w.get(), 1), round(self.dx, 2), round(self.dy, 2)
         core.save_settings(st)
@@ -924,6 +928,178 @@ class PrintWin(Page):
         return self.app.font_family()
 
 
+class PersonalWin(PrintWin):
+    """เมนู 2: แบบพิมพ์รายบุคคล + จ่าหน้าซอง — หน้าจอเดียว 3 ขั้น เลือกคน -> เลือกสิ่งที่พิมพ์ -> พิมพ์"""
+
+    def __init__(self, app):
+        Page.__init__(self, app)
+        self.app, self.db, self.kind = app, app.db, "form"
+        self.title("แบบพิมพ์รายบุคคล + จ่าหน้าซอง")
+        self.cancel, self.busy, self.cfg = False, False, {}
+        self.q = queue.Queue()
+        self.ptype = tk.StringVar(value=core.ALL_TYPES)
+        self.tam = tk.StringVar(value=core.ALL_TAMBON)
+        self.moo = tk.StringVar(value="ทั้งหมด")
+        self.only = tk.BooleanVar()
+        self.do_form, self.do_env = tk.BooleanVar(value=True), tk.BooleanVar(value=True)
+        self.copies = tk.IntVar(value=1)
+        self.printer = tk.StringVar(value=app.st.get("printer") or render.default_printer())
+        self.eprinter = tk.StringVar(value=app.st.get("env_printer", ""))
+        self.delay = tk.DoubleVar(value=0)
+        self.level = tk.StringVar(value="อำเภอ")
+        f = app.ui_font
+        sc = VScroll(self)
+        sc.pack(fill="both", expand=True)
+        body = ttk.Frame(sc.inner, padding=12)
+        body.pack(fill="both", expand=True)
+
+        def step(n, t):
+            ttk.Label(body, text="ขั้นที่ %s  %s" % (n, t), font=(f, 13, "bold")).pack(anchor="w", pady=(10, 4))
+
+        step(1, "เลือกคนที่จะพิมพ์")
+        g = ttk.Frame(body)
+        g.pack(anchor="w")
+        ttk.Label(g, text="ประเภททหาร").grid(row=0, column=0, sticky="w", pady=3)
+        ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + core.TYPES, state="readonly", width=36).grid(row=0, column=1, sticky="w", padx=8)
+        ttk.Label(g, text="ตำบล").grid(row=1, column=0, sticky="w", pady=3)
+        self.ctam = ttk.Combobox(g, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons(), state="readonly", width=20)
+        self.ctam.grid(row=1, column=1, sticky="w", padx=8)
+        self.ctam.bind("<<ComboboxSelected>>", lambda e: self.upd())
+        ttk.Label(g, text="หมู่ที่").grid(row=2, column=0, sticky="w", pady=3)
+        self.cmoo = ttk.Combobox(g, textvariable=self.moo, values=["ทั้งหมด"] + self.db.moos(), state="readonly", width=20)
+        self.cmoo.grid(row=2, column=1, sticky="w", padx=8)
+        self.cmoo.bind("<<ComboboxSelected>>", lambda e: self.upd())
+        ttk.Checkbutton(g, text="เฉพาะคนที่ยังไม่เคยพิมพ์", variable=self.only, command=self.upd).grid(row=3, column=1, sticky="w", padx=8, pady=3)
+        self.info = ttk.Label(body, text="", font=(f, 14, "bold"), foreground=GREEN)
+        self.info.pack(anchor="w", pady=(6, 0))
+
+        step(2, "เลือกสิ่งที่จะพิมพ์")
+        r2 = ttk.Frame(body)
+        r2.pack(anchor="w")
+        ttk.Checkbutton(r2, text="แบบพิมพ์รายบุคคล (A4 แนวตั้ง 1 หน้า/คน)", variable=self.do_form, command=self.upd).pack(anchor="w")
+        ttk.Checkbutton(r2, text="จ่าหน้าซอง (ซอง DL 1 ใบ/คน)", variable=self.do_env, command=self.upd).pack(anchor="w")
+        o = ttk.Frame(body)
+        o.pack(anchor="w", pady=(4, 0))
+        ttk.Label(o, text="จำนวนฉบับ/ชุด").pack(side="left")
+        Spin(o, from_=1, to=20, textvariable=self.copies, width=5).pack(side="left", padx=6)
+        self.warn = ttk.Label(body, text="", foreground="#C2410C", wraplength=640, justify="left")
+        self.warn.pack(anchor="w", pady=(6, 0))
+        ttk.Button(body, text="ไปแก้ข้อมูลหน่วย/เบอร์โทร/วันส่งคืนที่ตั้งค่า", command=lambda: app.nav("settings")).pack(anchor="w", pady=2)
+
+        step(3, "เลือกเครื่องพิมพ์ แล้วกดพิมพ์")
+        g2 = ttk.Frame(body)
+        g2.pack(anchor="w")
+        ttk.Label(g2, text="เครื่องพิมพ์ (แบบพิมพ์)").grid(row=0, column=0, sticky="w", pady=3)
+        ttk.Combobox(g2, textvariable=self.printer, values=render.list_printers(), width=46).grid(row=0, column=1, padx=8)
+        ttk.Label(g2, text="เครื่องพิมพ์ (ซอง) ว่าง = เครื่องเดียวกัน").grid(row=1, column=0, sticky="w", pady=3)
+        ttk.Combobox(g2, textvariable=self.eprinter, values=[""] + render.list_printers(), width=46).grid(row=1, column=1, padx=8)
+        bf = ttk.Frame(body)
+        bf.pack(anchor="w", pady=10)
+        ttk.Button(bf, text="ดูตัวอย่างแบบพิมพ์", command=lambda: self.preview("form")).pack(side="left", padx=3)
+        ttk.Button(bf, text="ดูตัวอย่างซอง", command=lambda: self.preview("env")).pack(side="left", padx=3)
+        ttk.Button(bf, text="พิมพ์ทดสอบ 1 คน", command=lambda: self.go(True)).pack(side="left", padx=3)
+        ttk.Button(bf, text="พิมพ์ทั้งหมดที่เลือก", style="Accent.TButton", command=lambda: self.go(False)).pack(side="left", padx=3)
+        ttk.Button(bf, text="ยกเลิก (Esc)", command=self.stop).pack(side="left", padx=12)
+        ttk.Button(body, text="ล้างสถานะ “พิมพ์แล้ว” ของงานนี้", command=self.reset_marks).pack(anchor="w")
+        self.log = tk.Text(body, height=7, width=84, font=("Consolas", 10), state="disabled")
+        self.log.pack(anchor="w", pady=8)
+        self.bind("<Escape>", lambda e: self.stop())
+        self.protocol("WM_DELETE_WINDOW", self.close)
+        self.upd()
+        self.pump()
+
+    def keys(self):
+        return [k for k, v in (("form", self.do_form), ("env", self.do_env)) if v.get()]
+
+    def mark_key(self):
+        return (self.keys() or ["form"])[0]
+
+    def sel(self, key=None, tam=None):
+        return self.db.select(self.ptype.get(), tam or self.tam.get(), None if self.moo.get() == "ทั้งหมด" else self.moo.get(),
+                              (key or self.mark_key()) if self.only.get() else None)
+
+    def upd(self):
+        t = self.tam.get()
+        self.cmoo["values"] = ["ทั้งหมด"] + self.db.moos(t)
+        if self.moo.get() not in self.cmoo["values"]:
+            self.moo.set("ทั้งหมด")
+        rows = self.sel()
+        k = self.keys()
+        self.info.config(text="จะพิมพ์ %d คน%s" % (len(rows), ("  →  %d หน้า/ใบ" % (len(rows) * len(k))) if k else "  (ยังไม่ได้เลือกสิ่งที่จะพิมพ์)"))
+        st = self.app.st
+        miss = []
+        if self.do_form.get():
+            miss += [n for key, n in (("sad_tel", "เบอร์โทรสัสดี"), ("deadline", "วันที่ส่งคืน")) if not st.get(key)]
+        if self.do_env.get() and not (st.get("unit_province") or st.get("province")):
+            miss.append("จังหวัดของหน่วย")
+        self.warn.config(text=("⚠ ยังไม่ได้กรอกในตั้งค่า: " + ", ".join(miss) + " (ช่องนั้นจะว่าง)") if miss else "")
+
+    def preview(self, kind):
+        rows = self.sel(kind)
+        if not rows:
+            return err("ไม่มีรายชื่อตามเงื่อนไข")
+        PreviewWin(self.app, layout.build(kind, rows, dict(self.app.st), self.ptype.get(), "", "อำเภอ"), self.TITLES[kind])
+
+    def reset_marks(self):
+        if messagebox.askyesno("ยืนยัน", "ล้างสถานะ “พิมพ์แล้ว” ของแบบพิมพ์และซองทั้งหมด?"):
+            self.db.clear_printed(["form", "env"])
+            self.upd()
+
+    def go(self, test):
+        if self.busy:
+            return
+        if not self.keys():
+            return err("ติ๊กเลือกสิ่งที่จะพิมพ์ก่อน (แบบพิมพ์ และ/หรือ ซอง)")
+        jobs = []
+        for k in self.keys():
+            rows = self.sel(k)
+            if test:
+                rows = rows[:1]
+            if rows:
+                jobs.append((k, rows))
+        if not jobs:
+            return err("ไม่มีรายชื่อตามเงื่อนไข")
+        if os.name != "nt":
+            return err("การพิมพ์ใช้ได้เฉพาะบน Windows (ดูตัวอย่างใช้ได้ทุกระบบ)")
+        txt = "\n".join("%s %d ใบ/หน้า × %d ฉบับ" % (self.TITLES[k], len(r), self.copies.get()) for k, r in jobs)
+        if not messagebox.askyesno("ยืนยัน", "%s\nเริ่มพิมพ์เลยไหม?" % txt):
+            return
+        self.app.st["printer"], self.app.st["env_printer"] = self.printer.get(), self.eprinter.get()
+        core.save_settings(self.app.st)
+        self.cancel, self.busy = False, True
+        threading.Thread(target=self.worker2, args=(jobs, test), daemon=True).start()
+
+    def worker2(self, jobs, test):
+        st = dict(self.app.st)
+        try:
+            for k, rows in jobs:
+                if self.cancel:
+                    break
+                form = layout.FORMS[k]
+                rot = k == "env" and bool(st.get("env_rot", True))
+                pr = (self.eprinter.get() or self.printer.get()) if k == "env" else self.printer.get()
+                self.say("%s: %d ใบ/หน้า → %s%s" % (self.TITLES[k], len(rows), pr or "(เครื่องพิมพ์เริ่มต้น)", " [หมุน 90°]" if rot else ""))
+                pages = layout.build(k, rows, st, self.ptype.get(), "", "อำเภอ")
+                gp = render.GdiPrinter(pr, form["paper"], form["landscape"] and not rot, self.app.font_family(), self.copies.get(), rot)
+                try:
+                    gp.print_doc(pages, "ZAIA %s" % k, lambda: self.cancel)
+                finally:
+                    gp.close()
+                if self.cancel:
+                    self.say("ยกเลิกระหว่างงานนี้ — ไม่ทำเครื่องหมายพิมพ์แล้ว")
+                    break
+                if not test:
+                    self.post(self.db.mark_printed, rows, k)
+                self.say("ส่งพิมพ์แล้ว %d หน้า" % len(pages))
+            self.say("เสร็จสิ้น" if not self.cancel else "หยุดแล้ว")
+        except Exception as e:
+            self.say("ผิดพลาด: %s" % e)
+            self.post(err, "พิมพ์ไม่สำเร็จ:\n%s" % e)
+        finally:
+            self.busy = False
+            self.post(self.upd)
+
+
 # ====================================================================== อัปเดต
 class UpdateWin(Page):
     def __init__(self, app):
@@ -1068,11 +1244,11 @@ class HomePage(Page):
         grid = tk.Frame(inner, bg=BG)
         grid.pack(fill="both", expand=True)
         items = [("1", "นำเข้าข้อมูลจากไฟล์ Excel", "เลือกไฟล์ ชีต แถวเริ่มต้น และจับคู่คอลัมน์ พร้อมดูตัวอย่างก่อนนำเข้า", "import", ACCENT),
-                 ("2", "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ", "แบบเดียวกับบัญชีสรุป (A4 แนวนอน) ช่อง G-I ว่างให้กรอก มีตัวอย่างลำดับที่ 1", "send", "#7A4FD6"),
-                 ("3", "บันทึกผลการตรวจสอบสภาพ", "ค้นด้วยเลขบัตร/ชื่อ กรอก มีตัว-ไม่มีตัว อาชีพ สถานที่ จังหวัด อำเภอ เบอร์โทร", "record", GREEN),
-                 ("4", "จัดพิมพ์บัญชีตรวจสอบสภาพ", "เลือกประเภททหาร ระดับผู้ลงนาม ตำบล พิมพ์เรียงหมู่ ทีละตำบล/หมู่", "reg", "#D98A00"),
-                 ("5", "บัญชีสรุปผลการตรวจสอบ", "เลือกประเภท (รวมทุกประเภท) ตำบล ผู้ลงนาม และจำนวนชุด", "sum", "#C2410C"),
-                 ("6", "แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "A4 1 หน้า/คน ให้ผู้ใหญ่บ้านกรอก และซอง DL พร้อมรหัสไปรษณีย์ระดับตำบล (ข้อมูลหน่วยกรอกที่ตั้งค่า)", "form", "#0E7490")]
+                 ("2", "แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "A4 1 หน้า/คน ให้ผู้ใหญ่บ้านกรอก และซอง DL พร้อมตราครุฑและรหัสไปรษณีย์ (ข้อมูลหน่วยกรอกที่ตั้งค่า)", "form", "#0E7490"),
+                 ("3", "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ", "แบบเดียวกับบัญชีสรุป (A4 แนวนอน) ช่อง G-I ว่างให้กรอก มีตัวอย่างลำดับที่ 1", "send", "#7A4FD6"),
+                 ("4", "บันทึกผลการตรวจสอบสภาพ", "ค้นด้วยเลขบัตร/ชื่อ กรอก มีตัว-ไม่มีตัว อาชีพ สถานที่ จังหวัด อำเภอ เบอร์โทร", "record", GREEN),
+                 ("5", "จัดพิมพ์บัญชีตรวจสอบสภาพ", "เลือกประเภททหาร ระดับผู้ลงนาม ตำบล พิมพ์เรียงหมู่ ทีละตำบล/หมู่", "reg", "#D98A00"),
+                 ("6", "บัญชีสรุปผลการตรวจสอบ", "เลือกประเภท (รวมทุกประเภท) ตำบล ผู้ลงนาม และจำนวนชุด", "sum", "#C2410C")]
         for i, (num, t, d, key, col) in enumerate(items):
             grid.columnconfigure(i % 2, weight=1, uniform="c")
             Card(grid, num, t, d, lambda k=key: app.nav(k), col).grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
@@ -1235,8 +1411,9 @@ class App(tk.Tk):
             tk.Label(head, image=self._logo_big, bg=NAVY).pack(side="left")
         tk.Label(head, text="ZAIA\nPrepare Personal", bg=NAVY, fg="white", font=(f, 13, "bold"), justify="left").pack(side="left", padx=10)
         self.navbtn = {}
-        for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("send", "2  ส่งผู้ใหญ่บ้านตรวจสอบ"),
-                         ("record", "3  บันทึกผลการตรวจสอบ"), ("reg", "4  พิมพ์บัญชีตรวจสอบสภาพ"), ("sum", "5  บัญชีสรุปผลการตรวจสอบ"), ("form", "6  แบบพิมพ์รายบุคคล / ซอง")):
+        for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("form", "2  แบบพิมพ์รายบุคคล / ซอง"),
+                         ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
+                         ("sum", "6  บัญชีสรุปผลการตรวจสอบ")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
         tk.Frame(self.side, bg="#34466E", height=1).pack(fill="x", padx=18, pady=14)
         self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
@@ -1264,9 +1441,9 @@ class App(tk.Tk):
     def set_title(self, t):
         self.h1.config(text=t)
 
-    TITLES = {"home": "หน้าแรก", "import": "1  นำเข้าข้อมูลจากไฟล์ Excel", "send": "2  ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
-              "record": "3  บันทึกผลการตรวจสอบสภาพ", "reg": "4  จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "5  บัญชีสรุปผลการตรวจสอบ",
-              "form": "6  แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
+    TITLES = {"home": "หน้าแรก", "import": "1  นำเข้าข้อมูลจากไฟล์ Excel", "send": "3  ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
+              "record": "4  บันทึกผลการตรวจสอบสภาพ", "reg": "5  จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "6  บัญชีสรุปผลการตรวจสอบ",
+              "form": "2  แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
 
     def nav(self, key):
         if key in ("send", "record", "reg", "sum", "form") and not self.db.persons:
@@ -1281,7 +1458,7 @@ class App(tk.Tk):
                 pass
         self.unbind("<Escape>")
         mk = {"home": lambda: HomePage(self), "import": lambda: ImportWin(self), "record": lambda: RecordWin(self),
-              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"), "form": lambda: PrintWin(self, "form"),
+              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"), "form": lambda: PersonalWin(self),
               "settings": lambda: SettingsWin(self), "update": lambda: UpdateWin(self)}
         self.set_title(self.TITLES[key])
         self.cur = mk[key]()

@@ -156,7 +156,7 @@ def default_printer():
 class GdiPrinter:
     """พิมพ์ pages ผ่าน GDI (Windows จัดรูปตัวอักษรไทยให้เอง) 1 เอกสาร = 1 StartDoc"""
 
-    def __init__(self, printer, paper, landscape, font, copies=1):
+    def __init__(self, printer, paper, landscape, font, copies=1, rot=False):
         import win32con
         import win32gui
         import win32print
@@ -180,6 +180,8 @@ class GdiPrinter:
         self.ox = self.dc.GetDeviceCaps(112)       # PHYSICALOFFSETX
         self.oy = self.dc.GetDeviceCaps(113)
         self._fonts = {}
+        self.rot = rot         # หมุนเนื้อหา (แนวนอน) 90° ลงกระดาษแนวตั้ง เช่น ซองป้อนด้านสั้น
+        self._rf = {}
 
     def _font(self, px, bold):
         key = (round(px), bold)
@@ -221,6 +223,10 @@ class GdiPrinter:
         kx, ky = self.dpx / 25.4, self.dpy / 25.4
         X = lambda mm: int(round(mm * kx - self.ox))
         Y = lambda mm: int(round(mm * ky - self.oy))
+        if self.rot:
+            H = pg.h
+            PX = lambda u, v: int(round((H - v) * kx - self.ox))       # (u,v) มม. บนหน้าแนวนอน -> พิกัดอุปกรณ์แนวตั้ง
+            PY = lambda u, v: int(round(u * ky - self.oy))
         def meas(tx, px, b):
             old = dc.SelectObject(self._font(px, b))
             wd = dc.GetTextExtent(tx)[0]
@@ -232,13 +238,20 @@ class GdiPrinter:
             if t == "fill":
                 _, x, y, w, h, g = op
                 br = win32ui.CreateBrush(0, g * 0x010101, 0)
-                dc.FillRect((X(x), Y(y), X(x + w), Y(y + h)), br)
+                if self.rot:
+                    dc.FillRect((PX(x, y + h), PY(x, y), PX(x, y), PY(x + w, y)), br)
+                else:
+                    dc.FillRect((X(x), Y(y), X(x + w), Y(y + h)), br)
             elif t == "line":
                 _, x1, y1, x2, y2, w, dash = op
                 pen = win32ui.CreatePen(2 if dash else 0, max(1, int(round(w * kx))), 0)
                 old = dc.SelectObject(pen)
-                dc.MoveTo((X(x1), Y(y1)))
-                dc.LineTo((X(x2), Y(y2)))
+                if self.rot:
+                    dc.MoveTo((PX(x1, y1), PY(x1, y1)))
+                    dc.LineTo((PX(x2, y2), PY(x2, y2)))
+                else:
+                    dc.MoveTo((X(x1), Y(y1)))
+                    dc.LineTo((X(x2), Y(y2)))
                 dc.SelectObject(old)
             elif t == "text":
                 _, x, y, w, h, text, al, pt, bold, _g = op[:10]
@@ -249,21 +262,53 @@ class GdiPrinter:
                 th = dc.GetTextExtent(text)[1]
                 tx = X(x) + (0 if al == "l" else int((w * kx - tw) / 2) if al == "c" else int(w * kx - tw))
                 ty = Y(y) + int((h * ky - th) / 2)
-                dc.TextOut(tx, ty, text)
-                dc.SelectObject(old)
+                if self.rot:
+                    dc.SelectObject(old)
+                    self._rtext(PX((tx + self.ox) / kx, (ty + self.oy) / ky), PY((tx + self.ox) / kx, (ty + self.oy) / ky), text, px * fac[oi], bold)
+                else:
+                    dc.TextOut(tx, ty, text)
+                    dc.SelectObject(old)
             elif t == "img":
-                self._img(op, X, Y, kx, ky)
+                if self.rot:
+                    _, path, x, y, w, h = op
+                    self._img(op, lambda m: PX(m, 0), lambda m: PY(0, 0), kx, ky, rotate=(PX(x, y + h), PY(x, y), h, w))
+                else:
+                    self._img(op, X, Y, kx, ky)
 
-    def _img(self, op, X, Y, kx, ky):
+    def _rtext(self, x, y, text, px, bold):
+        """ข้อความหมุน 90° ตามเข็ม (escapement 2700) ด้วย gdi32 ตรง ๆ -- ใช้ ctypes ธรรมดา"""
+        import ctypes
+        gdi = ctypes.windll.gdi32
+        key = (round(px), bold)
+        if key not in self._rf:
+            gdi.CreateFontW.restype = ctypes.c_void_p
+            self._rf[key] = gdi.CreateFontW(-max(5, round(px)), 0, 2700, 2700, 700 if bold else 400, 0, 1 if bold == "u" else 0, 0,
+                                            222, 0, 0, 0, 0, self.font)
+        hdc = self.dc.GetSafeHdc()
+        gdi.SelectObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        gdi.SelectObject.restype = ctypes.c_void_p
+        gdi.TextOutW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_wchar_p, ctypes.c_int]
+        old = gdi.SelectObject(hdc, self._rf[key])
+        gdi.TextOutW(hdc, x, y, text, len(text))
+        gdi.SelectObject(hdc, old)
+
+    def _img(self, op, X, Y, kx, ky, rotate=None):
         """ลายเซ็น: ส่งภาพ DIB ตรงไปเครื่องพิมพ์ด้วย StretchDIBits (ไดรเวอร์เครื่องพิมพ์รองรับกว่า BitBlt จาก memory DC)
         โหมด SRCAND: พื้นขาวไม่ทับตัวอักษรข้างใต้ ถ้าไดรเวอร์ไม่รับ SRCAND จะลองแบบ SRCCOPY (พื้นขาว) แทน"""
         import ctypes
         c = ctypes
         from PIL import Image
         _, path, x, y, w, h = op
+        if rotate:                                                      # (x, y, w_mm, h_mm) ของกรอบหลังหมุนแล้ว
+            rx, ry, w, h = rotate
+            X, Y = (lambda m, _v=rx: _v), (lambda m, _v=ry: _v)
+            x = y = 0
         pw, ph = max(1, int(w * kx)), max(1, int(h * ky))
         sw, sh = min(pw * 2, 1600), min(ph * 2, 1600)                  # ความละเอียดต้นทางสูงกว่าปลายทางเล็กน้อย
-        im = Image.open(path).convert("RGBA").resize((sw, sh))
+        im = Image.open(path).convert("RGBA")
+        if rotate:
+            im = im.rotate(-90, expand=True)
+        im = im.resize((sw, sh))
         bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
         bg.alpha_composite(im)
         raw = bg.convert("RGB").tobytes("raw", "BGRX")
