@@ -54,6 +54,16 @@ def make_log(parent, **kw):
 def log_line(t, line):
     """เขียน 1 บรรทัดลง make_log: [เวลา] เทา + ข้อความสีตามเนื้อหา"""
     t.config(state="normal")
+    if line.startswith("▶"):                       # หัวข้อรุ่น (changelog)
+        t.insert("end", line + "\n", "head")
+        t.see("end")
+        t.config(state="disabled")
+        return
+    if line.startswith("  •"):                     # รายการใน changelog ใช้สีปกติ
+        t.insert("end", line + "\n", "")
+        t.see("end")
+        t.config(state="disabled")
+        return
     ts = ""
     if line.startswith("[") and "]" in line[:12]:
         i = line.index("]") + 1
@@ -76,6 +86,7 @@ def log_set(t, s):
     t.config(state="disabled")
     for ln in s.splitlines():
         log_line(t, ln)
+    t.yview_moveto(0)                              # แสดงจากบรรทัดบนสุด (รายการอัปเดตอ่านจากบนลงล่าง)
 
 
 class Page(ttk.Frame):
@@ -1498,6 +1509,21 @@ class UpdateWin(Page):
     def put(self, s):
         log_set(self.box, s)
 
+    @staticmethod
+    def _ver(v):
+        try:
+            return tuple(int(x) for x in str(v).split("."))
+        except ValueError:
+            return (0,)
+
+    def changes(self, m, since=None, limit=None):
+        """ข้อความรายการสิ่งที่ปรับ จาก changelog ใน update.json  since=แสดงเฉพาะรุ่นที่ใหม่กว่านี้"""
+        cl = [c for c in (m.get("changelog") or []) if since is None or self._ver(c["version"]) > self._ver(since)]
+        cl = cl[:limit] if limit else cl
+        if not cl:
+            return m.get("notes", "")
+        return "\n".join("▶ รุ่น %s\n%s\n" % (c["version"], "\n".join("  • " + t for t in c["items"])) for c in cl)
+
     def check(self):
         self.btn.config(state="disabled")
         try:
@@ -1509,12 +1535,15 @@ class UpdateWin(Page):
         if updater.has_patch(m):        # แพตช์โค้ดออนไลน์ (ไม่ต้องติดตั้ง Setup ใหม่)
             self.mode = "patch"
             pv = m["patch"]
-            self.put("มีแพตช์รุ่น %s (ปัจจุบัน %s)\nไฟล์โค้ด %d ไฟล์ จะดาวน์โหลดทั้งชุดและตรวจ SHA-256 ก่อนใช้งาน\n\n%s\n\nหลังอัปเดตโปรแกรมจะเปิดใหม่เอง" % (
-                pv["version"], APP_VER, len(pv["files"]), m.get("notes", "")))
+            if self._ver(pv["version"]) <= self._ver(APP_VER):
+                self.put("เป็นรุ่นล่าสุดแล้ว (%s)\n\nประวัติการอัปเดตล่าสุด:\n%s" % (APP_VER, self.changes(m, limit=5)))
+                return
+            self.put("มีแพตช์รุ่น %s (ปัจจุบัน %s)\nไฟล์โค้ด %d ไฟล์ จะดาวน์โหลดทั้งชุดและตรวจ SHA-256 ก่อนใช้งาน\nหลังอัปเดตโปรแกรมจะเปิดใหม่เอง\n\nสิ่งที่ปรับในรุ่นนี้:\n%s" % (
+                pv["version"], APP_VER, len(pv["files"]), self.changes(m, since=APP_VER)))
             self.btn.config(state="normal")
             return
         if not updater.is_newer(m):
-            return self.put("เป็นรุ่นล่าสุดแล้ว (%s)" % APP_VER)
+            return self.put("เป็นรุ่นล่าสุดแล้ว (%s)\n\nประวัติการอัปเดตล่าสุด:\n%s" % (APP_VER, self.changes(m, limit=5)))
         self.todo = updater.plan(m)      # อัปเดตได้เสมอ ไม่ว่ารุ่นห่างแค่ไหน (เทียบ hash ทุกไฟล์) setup_rev เป็นแค่คำแนะนำ
         extra = ("\n\n(แนะนำ: รุ่นนี้มี Setup ใหม่ %s)" % m.get("setup_url", "")) if updater.needs_setup(m) else ""
         if not self.todo:

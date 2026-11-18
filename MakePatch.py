@@ -30,6 +30,12 @@ def main():
     m["version"], m["setup_rev"] = ver, rev
     m.setdefault("files", [])
     m["patch"] = {"version": ver, "files": files}
+    try:                                   # ประวัติการอัปเดต (changelog.json) แสดงในหน้า ตรวจสอบอัปเดต
+        m["changelog"] = json.load(open(os.path.join(ROOT, "changelog.json"), encoding="utf-8"))
+        top = m["changelog"][0]            # เครื่องรุ่นเก่าแสดงเฉพาะ notes จึงใส่รุ่นล่าสุดไว้ให้
+        m["notes"] = "รุ่น %s:\n" % top["version"] + "\n".join(" - " + t for t in top["items"])
+    except (OSError, ValueError):
+        pass
     with open(out, "w", encoding="utf-8") as f:
         json.dump(m, f, ensure_ascii=False, indent=1)
     print("OK patch %s files=%d -> %s" % (ver, len(files), out))
