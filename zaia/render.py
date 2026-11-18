@@ -10,7 +10,7 @@ def fit_factors(page, k, measure):
     for i, op in enumerate(page.ops):
         if op[0] != "text":
             continue
-        _, x, y, w, h, text, al, pt, bold, g = op
+        _, x, y, w, h, text, al, pt, bold, g = op[:10]
         px = pt * 25.4 / 72 * k
         tw = measure(text, px, bold)
         f = 1.0 if tw <= w * k or tw <= 0 else max(FIT_MIN, 0.97 * (w * k) / tw)
@@ -71,12 +71,13 @@ def render_pil(page, dpi=100, fontfile=None, boldfile=None):
             else:
                 d.line([x1 * k, y1 * k, x2 * k, y2 * k], fill="black", width=lw)
         elif t == "text":
-            _, x, y, w, h, text, al, pt, bold, _g = op
+            _, x, y, w, h, text, al, pt, bold, _g = op[:10]
+            col = "#%02x%02x%02x" % op[10] if len(op) > 10 else "black"
             px = pt / 72 * dpi
             f = font(px * fac[oi], bold)
             tw = f.getlength(text)
             tx = x * k + (0 if al == "l" else (w * k - tw) / 2 if al == "c" else w * k - tw)
-            d.text((tx, (y + h / 2) * k), text, font=f, fill="black", anchor="lm")
+            d.text((tx, (y + h / 2) * k), text, font=f, fill=col, anchor="lm")
             if bold == "u":
                 uy = (y + h / 2) * k + f.size * 0.55
                 d.line([tx, uy, tx + tw, uy], fill="black", width=max(1, round(f.size / 14)))
@@ -115,12 +116,12 @@ def draw_tk(canvas, page, k, family, tkfont):
             _, x1, y1, x2, y2, w, dash = op
             canvas.create_line(x1 * k, y1 * k, x2 * k, y2 * k, width=max(1, w * k), dash=(2, 3) if dash else None)
         elif t == "text":
-            _, x, y, w, h, text, al, pt, bold, _g = op
+            _, x, y, w, h, text, al, pt, bold, _g = op[:10]
             px = pt * 25.4 / 72 * k
             f = mk(px * fac[oi], bold)
             tw = f.measure(text)
             tx = x * k + (0 if al == "l" else (w * k - tw) / 2 if al == "c" else w * k - tw)
-            canvas.create_text(tx, (y + h / 2) * k, text=text, font=f, anchor="w")
+            canvas.create_text(tx, (y + h / 2) * k, text=text, font=f, anchor="w", fill=("#%02x%02x%02x" % op[10]) if len(op) > 10 else "black")
         elif t == "img":
             try:
                 from PIL import Image, ImageTk
@@ -240,9 +241,10 @@ class GdiPrinter:
                 dc.LineTo((X(x2), Y(y2)))
                 dc.SelectObject(old)
             elif t == "text":
-                _, x, y, w, h, text, al, pt, bold, _g = op
+                _, x, y, w, h, text, al, pt, bold, _g = op[:10]
                 px = pt / 72 * self.dpy
                 old = dc.SelectObject(self._font(px * fac[oi], bold))
+                dc.SetTextColor(op[10][0] | (op[10][1] << 8) | (op[10][2] << 16) if len(op) > 10 else 0)
                 tw = dc.GetTextExtent(text)[0]
                 th = dc.GetTextExtent(text)[1]
                 tx = X(x) + (0 if al == "l" else int((w * kx - tw) / 2) if al == "c" else int(w * kx - tw))
@@ -253,28 +255,36 @@ class GdiPrinter:
                 self._img(op, X, Y, kx, ky)
 
     def _img(self, op, X, Y, kx, ky):
-        """ลายเซ็น: ผสมบนพื้นขาวแล้ว BitBlt แบบ SRCAND (พื้นขาวไม่ทับตัวอักษรข้างใต้)"""
-        win32con, win32gui, win32print, win32ui = self.w32
+        """ลายเซ็น: ส่งภาพ DIB ตรงไปเครื่องพิมพ์ด้วย StretchDIBits (ไดรเวอร์เครื่องพิมพ์รองรับกว่า BitBlt จาก memory DC)
+        โหมด SRCAND: พื้นขาวไม่ทับตัวอักษรข้างใต้ ถ้าไดรเวอร์ไม่รับ SRCAND จะลองแบบ SRCCOPY (พื้นขาว) แทน"""
+        import ctypes
+        from ctypes import wintypes
         from PIL import Image
         _, path, x, y, w, h = op
         pw, ph = max(1, int(w * kx)), max(1, int(h * ky))
-        im = Image.open(path).convert("RGBA").resize((pw, ph))
+        sw, sh = min(pw * 2, 1600), min(ph * 2, 1600)                  # ความละเอียดต้นทางสูงกว่าปลายทางเล็กน้อย
+        im = Image.open(path).convert("RGBA").resize((sw, sh))
         bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
         bg.alpha_composite(im)
-        raw = bg.convert("RGB").tobytes("raw", "BGRX")          # 32 บิต เรียงบนลงล่าง
-        hdc = self.dc.GetSafeHdc()
-        import ctypes
+        raw = bg.convert("RGB").tobytes("raw", "BGRX")
+
+        class BIH(ctypes.Structure):
+            _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
+                        ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD),
+                        ("biSizeImage", wintypes.DWORD), ("biXPelsPerMeter", wintypes.LONG), ("biYPelsPerMeter", wintypes.LONG),
+                        ("biClrUsed", wintypes.DWORD), ("biClrImportant", wintypes.DWORD)]
+        bih = BIH(40, sw, -sh, 1, 32, 0, len(raw), 0, 0, 0, 0)         # ความสูงติดลบ = เรียงบนลงล่าง
         buf = ctypes.create_string_buffer(raw, len(raw))
         gdi = ctypes.windll.gdi32
-        gdi.CreateBitmap.restype = ctypes.c_void_p
-        hbmp = gdi.CreateBitmap(pw, ph, 1, 32, buf)      # pywin32 ไม่รับข้อมูลพิกเซล -> เรียก GDI ตรง
-        if not hbmp:
-            raise RuntimeError("สร้างบิตแมปลายเซ็นไม่สำเร็จ")
-        mem = win32gui.CreateCompatibleDC(hdc)
-        old = win32gui.SelectObject(mem, hbmp)
-        try:
-            win32gui.BitBlt(hdc, X(x), Y(y), pw, ph, mem, 0, 0, 0x008800C6)   # SRCAND: พื้นขาวไม่ทับตัวอักษรข้างใต้
-        finally:
-            win32gui.SelectObject(mem, old)
-            win32gui.DeleteDC(mem)
-            win32gui.DeleteObject(hbmp)
+        gdi.StretchDIBits.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                      ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                      ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT, wintypes.DWORD]
+        gdi.StretchDIBits.restype = ctypes.c_int
+        gdi.SetStretchBltMode.argtypes = [wintypes.HDC, ctypes.c_int]
+        hdc = self.dc.GetSafeHdc()
+        gdi.SetStretchBltMode(hdc, 4)                                  # HALFTONE
+        for rop in (0x008800C6, 0x00CC0020):                           # SRCAND แล้วค่อย SRCCOPY
+            r = gdi.StretchDIBits(hdc, X(x), Y(y), pw, ph, 0, 0, sw, sh, buf, ctypes.byref(bih), 0, rop)
+            if r not in (0, -1):
+                return
+        raise RuntimeError("พิมพ์ลายเซ็นไม่สำเร็จ (ไดรเวอร์เครื่องพิมพ์ไม่รับภาพ)")

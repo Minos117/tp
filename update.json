@@ -1,10 +1,10 @@
 {
- "version": "1.0.3",
+ "version": "1.0.4",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "files": [
    {
     "path": "assets/logo.ico",
@@ -39,20 +39,20 @@
    {
     "path": "zaia/layout.py",
     "url": "zaia/layout.py",
-    "sha256": "b278d94e60fad5f7093224e8971c82b3e2b37a96abafd4d3f59dd1b707563efb",
-    "size": 19166
+    "sha256": "8c8aa4b93656b66ff421ea24e0c4c1b2a2cf84a2a8784c5b00f129afaff5006a",
+    "size": 20012
    },
    {
     "path": "zaia/render.py",
     "url": "zaia/render.py",
-    "sha256": "cde2af93ac2f795dbea8f49c05e9099e57dfe0d96819f010d25b3a6dba7d846b",
-    "size": 11687
+    "sha256": "a7f36e79b819a8ca5b4d923a2709cdea432cbaec57f81b8593a7ffb6f75aab2e",
+    "size": 13190
    },
    {
     "path": "zaia/ui.py",
     "url": "zaia/ui.py",
-    "sha256": "02478f42dda0b37ebfb2cde2f463cecf2991d238e0aab2921ce2ee8984d9f581",
-    "size": 72067
+    "sha256": "2f5f1dcb5ff488e6549e4dd22f9453af843fb68793e690e436a35a12183bab78",
+    "size": 73170
    },
    {
     "path": "zaia/updater.py",
@@ -63,7 +63,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "09bd0dbfe32751e055b93d48cf9e813b53c99944ab0f625bb3e37a3d083a7ca4",
+    "sha256": "8db25fae29c7001ff096b20e74a2b728142269287ebd61c5801129afd448166e",
     "size": 888
    }
   ]

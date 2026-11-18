@@ -959,7 +959,18 @@ class HomePage(Page):
         n = len(db.persons)
         done = sum(1 for p in db.persons if db.filled(p))
         printed = sum(1 for p in db.persons if any(k.startswith("reg_") for k in p.get("printed", {})))
-        row = tk.Frame(self, bg=BG)
+        cv = tk.Canvas(self, bg=BG, highlightthickness=0)             # หน้าแรกเลื่อนขึ้นลงได้ (ล้อเมาส์/แถบเลื่อน) ไม่ให้ขั้นตอนตกจอ
+        vs = ttk.Scrollbar(self, orient="vertical", command=cv.yview)
+        cv.configure(yscrollcommand=vs.set)
+        vs.pack(side="right", fill="y")
+        cv.pack(side="left", fill="both", expand=True)
+        inner = tk.Frame(cv, bg=BG)
+        win = cv.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
+        cv.bind("<Configure>", lambda e: cv.itemconfigure(win, width=e.width))
+        self.cv = cv
+        self.bind_all("<MouseWheel>", self._wheel)
+        row = tk.Frame(inner, bg=BG)
         row.pack(fill="x")
         stats = [("รายชื่อทั้งหมด", str(n), "คน", NAVY), ("บันทึกผลแล้ว", str(done), "จาก %d คน" % n, GREEN),
                  ("รอเขียนกลับ Excel", str(db.dirty_count()), "คน", "#D98A00"), ("พิมพ์บัญชีตรวจสอบแล้ว", str(printed), "คน", ACCENT)]
@@ -970,14 +981,14 @@ class HomePage(Page):
             tk.Label(f, text=t, bg=CARD, fg=MUTED, font=(fam, 11)).pack(anchor="w", padx=16, pady=(12, 0))
             tk.Label(f, text=v, bg=CARD, fg=c, font=(fam, 28, "bold")).pack(anchor="w", padx=16)
             tk.Label(f, text=u, bg=CARD, fg=MUTED, font=(fam, 10)).pack(anchor="w", padx=16, pady=(0, 10))
-        pb = ttk.Progressbar(self, maximum=max(1, n), value=done, style="Green.Horizontal.TProgressbar")
+        pb = ttk.Progressbar(inner, maximum=max(1, n), value=done, style="Green.Horizontal.TProgressbar")
         pb.pack(fill="x", pady=(12, 4))
         src = db.source.get("path", "")
-        tk.Label(self, bg=BG, fg=MUTED, font=(fam, 11), anchor="w",
+        tk.Label(inner, bg=BG, fg=MUTED, font=(fam, 11), anchor="w",
                  text=("ไฟล์ข้อมูล: %s  [%s]" % (src, db.source.get("sheet", ""))) if n else "ยังไม่มีข้อมูล — เริ่มที่ขั้นตอน 1 นำเข้าข้อมูลจากไฟล์ Excel").pack(fill="x")
-        self._progress_table(db, fam)
-        tk.Label(self, text="เลือกขั้นตอน", bg=BG, fg=NAVY, font=(fam, 15, "bold"), anchor="w").pack(fill="x", pady=(18, 8))
-        grid = tk.Frame(self, bg=BG)
+        _progress_table(inner, db, fam)
+        tk.Label(inner, text="เลือกขั้นตอน", bg=BG, fg=NAVY, font=(fam, 15, "bold"), anchor="w").pack(fill="x", pady=(18, 8))
+        grid = tk.Frame(inner, bg=BG)
         grid.pack(fill="both", expand=True)
         items = [("1", "นำเข้าข้อมูลจากไฟล์ Excel", "เลือกไฟล์ ชีต แถวเริ่มต้น และจับคู่คอลัมน์ พร้อมดูตัวอย่างก่อนนำเข้า", "import", ACCENT),
                  ("2", "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ", "แบบเดียวกับบัญชีสรุป (A4 แนวนอน) ช่อง G-I ว่างให้กรอก มีตัวอย่างลำดับที่ 1", "send", "#7A4FD6"),
@@ -987,6 +998,20 @@ class HomePage(Page):
         for i, (num, t, d, key, col) in enumerate(items):
             grid.columnconfigure(i % 2, weight=1, uniform="c")
             Card(grid, num, t, d, lambda k=key: app.nav(k), col).grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
+
+    def _wheel(self, e):
+        try:
+            if self.cv.winfo_exists():
+                self.cv.yview_scroll(-1 * (e.delta // 120), "units")
+        except tk.TclError:
+            pass
+
+    def destroy(self):
+        try:
+            self.unbind_all("<MouseWheel>")
+        except tk.TclError:
+            pass
+        super().destroy()
 
 
 def _progress_table(self, db, fam):
@@ -1032,7 +1057,6 @@ def _progress_table(self, db, fam):
     tv.bind("<Double-1>", toggle)
 
 
-HomePage._progress_table = _progress_table
 
 
 class App(tk.Tk):

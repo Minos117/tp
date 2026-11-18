@@ -70,11 +70,12 @@ class _Ctx:
         self.s = 1.0
 
 
-def _t(pg, x, y, w, h, text, align="c", pt=16, bold=False, grp=None):
+def _t(pg, x, y, w, h, text, align="c", pt=16, bold=False, grp=None, color=None):
     if text != "" and text is not None:
         if w > 6:                       # เว้นขอบในช่อง ไม่ให้ข้อความชนเส้น
             x, w = x + PAD, w - 2 * PAD
-        pg.ops.append(("text", x, y - 0.35, w, h, str(text), align, pt, bold, grp))
+        op = ("text", x, y - 0.35, w, h, str(text), align, pt, bold, grp)
+        pg.ops.append(op + (color,) if color else op)
 
 
 def _ln(pg, x1, y1, x2, y2, w=0.25, dash=False):
@@ -136,6 +137,12 @@ def build_reg(ctx):
         y = g["mt"]
         if pn == 0:
             _t(pg, xs[0], y, tw, title_h, "บัญชีตรวจสอบสภาพทหารกองหนุน", "c", 20 * s, "u")
+            # กล่องข้อความมุมขวาบนตามเทมเพลต Excel: "ทบ. 100 - 070" (ชิดขวา) และข้อความสีแดงด้านล่าง (ระยะ EMU/36000 = มม., เว้นขอบกล่อง 2.54 มม.)
+            m0, ins = g["mt"], 2.54 * s
+            xa, xb = xs[12] + 1.85 * s + ins, xs[13] + 15.6 * s - ins
+            _t(pg, xa, m0 + 0.8 * s + 1.27 * s, xb - xa, Lh, "ทบ. 100 - 070", "r", pt)
+            xa, xb = xs[10] + 15.35 * s + ins, xs[13] + 15.9 * s - ins
+            _t(pg, xa, m0 + 5.8 * s + 1.27 * s, xb - xa, Lh, "ตรวจสอบสภาพทหารกองหนุนประจำปี " + str(st.get("year", 2570)), "l", pt, color=(255, 0, 0))
             y += title_h
             tam = ctx.tambon if ctx.tambon else ""
             info = [("สำหรับ", ctx.ptype, "แผนก", "ทหารบก"),
