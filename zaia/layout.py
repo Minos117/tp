@@ -459,6 +459,8 @@ def build_env(ctx):
         gr = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "garuda.png")
     for p in ctx.persons:
         pg = Page(g["w"], g["h"])
+        for fy in (99.0, 198.0):                                 # เส้นประรอยพับสาม
+            _ln(pg, 4, fy, g["w"] - 4, fy, 0.15, True)
         sx = 14
         if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
             gh = 25.0

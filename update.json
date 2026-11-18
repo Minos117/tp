@@ -1,10 +1,10 @@
 {
- "version": "1.0.12",
+ "version": "1.0.13",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.12",
+  "version": "1.0.13",
   "files": [
    {
     "path": "assets/garuda.png",
@@ -45,8 +45,8 @@
    {
     "path": "zaia/layout.py",
     "url": "zaia/layout.py",
-    "sha256": "82761a3c7fe67c2741d1fe35bc0a5a4fd18c641848c2f2f6b022317b521e99c5",
-    "size": 31482
+    "sha256": "3563dae3fe353cb2bd4313b631a41f76cfc1a9429914aee63a973f79f03b59ed",
+    "size": 31653
    },
    {
     "path": "zaia/render.py",
@@ -69,7 +69,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "174270cb00978761a0c7c9c57f4b3dd83b6cf08c63893b045c26255e1934e57f",
+    "sha256": "359b9864c4752588ee2e237cc42953096a32e2cf9411d606d134cd8fd9cd7a9e",
     "size": 889
    },
    {
