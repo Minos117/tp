@@ -21,7 +21,7 @@ for pkg in ('openpyxl', 'PIL', 'pyxlsb', 'lxml'):
 a = Analysis(
     ['app.py'],
     pathex=['.'],
-    datas=[('zaia/*.py', 'src/zaia'), ('zaia/geo_th.json', 'src/zaia'), ('assets', 'src/assets')],
+    datas=[('zaia/*.py', 'src/zaia'), ('zaia/geo_th.json', 'src/zaia'), ('zaia/zip_th.json', 'src/zaia'), ('assets', 'src/assets')],
     hiddenimports=hidden,
     excludes=['zaia'],
     noarchive=False,

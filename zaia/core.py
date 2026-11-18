@@ -117,7 +117,56 @@ DEFAULT_SETTINGS = {
     "sign_kamnan": ["ได้ตรวจถูกต้องแล้ว", "", "           กำนันตำบล{ตำบล}"],
     "sig_image": "", "sig_level": "อำเภอ", "sig_w": 32.0, "sig_dx": 0.0, "sig_dy": 0.0,
     "update_url": "",
+    "unit_name": "หน่วยสัสดีอำเภอ", "unit_addr": "ที่ว่าการอำเภอ", "unit_amphoe": "", "unit_province": "", "unit_zip": "",
+    "sad_tel": "", "deadline": "", "env_no": "",
 }
+
+
+_ZIP = None
+
+
+def _zip_data():
+    global _ZIP
+    if _ZIP is None:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "zip_th.json"), encoding="utf-8") as f:
+                _ZIP = json.load(f)
+        except (OSError, ValueError):
+            _ZIP = {}
+    return _ZIP
+
+
+def _nm(s, pre=()):
+    s = str(s or "").strip()
+    for p in pre:
+        if s.startswith(p):
+            s = s[len(p):]
+    return s.strip()
+
+
+def zip_lookup(province, amphoe, tambon=""):
+    """รหัสไปรษณีย์จาก จังหวัด/อำเภอ/ตำบล (ระดับตำบลทั่วประเทศ); ไม่พบคืน ''; ไม่ระบุตำบลคืนรหัสของ อ.เมือง/ที่พบบ่อยสุด"""
+    d = _zip_data()
+    pv = _nm(province, ("จังหวัด", "จ."))
+    if pv in ("กรุงเทพ", "กรุงเทพฯ", "กทม."):
+        pv = "กรุงเทพมหานคร"
+    am = _nm(amphoe, ("อำเภอ", "อ.", "เขต"))
+    tb = _nm(tambon, ("ตำบล", "ต.", "แขวง"))
+    a = d.get(pv, {})
+    cand = [am, "เมือง" + am, am.replace("เมือง", "", 1)] + (["เมือง" + pv] if am == "เมือง" else [])
+    for c in cand:
+        if c in a:
+            t = a[c]
+            if tb in t:
+                return t[tb]
+            if tb:
+                for k, v in t.items():                 # ชื่อใกล้เคียง (วรรณยุกต์/ต่อท้าย)
+                    if k.startswith(tb) or tb.startswith(k):
+                        return v
+                return ""
+            vals = list(t.values())
+            return max(set(vals), key=vals.count) if vals else ""
+    return ""
 
 
 def load_settings():

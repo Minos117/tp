@@ -20,7 +20,7 @@ def main():
         m = json.load(open(out, encoding="utf-8"))
     except Exception:
         m = {"files": []}
-    paths = sorted(glob.glob(os.path.join(ROOT, "zaia", "*.py")) + [os.path.join(ROOT, "zaia", "geo_th.json")]
+    paths = sorted(glob.glob(os.path.join(ROOT, "zaia", "*.py")) + [os.path.join(ROOT, "zaia", "geo_th.json"), os.path.join(ROOT, "zaia", "zip_th.json")]
                    + glob.glob(os.path.join(ROOT, "assets", "*")))
     files = []
     for p in paths:

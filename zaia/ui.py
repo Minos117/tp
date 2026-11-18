@@ -136,6 +136,25 @@ class SettingsWin(Page):
         self.backup = tk.BooleanVar(value=st.get("backup", True))
         ttk.Checkbutton(f1, text="สำรองไฟล์ Excel ต้นฉบับอัตโนมัติก่อนเขียนกลับ", variable=self.backup).grid(
             row=len(rows), column=0, columnspan=2, sticky="w", pady=8)
+        # ---- ข้อมูลหน่วยสัสดี (ใช้กับ เมนู 6 แบบพิมพ์รายบุคคล + จ่าหน้าซอง)
+        f3o = ttk.Frame(nb)
+        nb.add(f3o, text="  ข้อมูลหน่วย / แบบพิมพ์รายบุคคล  ")
+        sc3 = VScroll(f3o)
+        sc3.pack(fill="both", expand=True)
+        f3 = ttk.Frame(sc3.inner, padding=16)
+        f3.pack(fill="both", expand=True)
+        ttk.Label(f3, text="กรอกครั้งเดียว โปรแกรมดึงไปใส่แบบพิมพ์รายบุคคลและซองจดหมายให้ทุกใบ (เมนู 6)", foreground="#555").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        rows3 = [("unit_name", "ชื่อหน่วย (ผู้ส่งบนซอง)"), ("unit_addr", "ที่ตั้ง/บรรทัดที่อยู่ (เช่น ที่ว่าการอำเภอ)"),
+                 ("unit_amphoe", "อำเภอของหน่วย (ว่าง = ใช้อำเภอสำรอง)"), ("unit_province", "จังหวัดของหน่วย (ว่าง = ใช้จังหวัดสำรอง)"),
+                 ("unit_zip", "รหัสไปรษณีย์หน่วย (ว่าง = คิดให้อัตโนมัติ)"), ("sad_tel", "เบอร์โทรสัสดีอำเภอ (พิมพ์บนแบบพิมพ์)"),
+                 ("deadline", "ให้ส่งคืนภายในวันที่ (เช่น 15 ธันวาคม 2569)"), ("env_no", "เลขที่หนังสือบนซอง “ที่ …” (ว่าง = ไม่พิมพ์)")]
+        for i, (k, lab) in enumerate(rows3, 1):
+            ttk.Label(f3, text=lab).grid(row=i, column=0, sticky="w", pady=5)
+            self.v[k] = tk.StringVar(value=str(st.get(k, "")))
+            ttk.Entry(f3, textvariable=self.v[k], width=46).grid(row=i, column=1, pady=5, padx=8, sticky="w")
+        self.zipmsg = ttk.Label(f3, text="")
+        ttk.Button(f3, text="คิดรหัสไปรษณีย์จากอำเภอ/จังหวัดของหน่วย", command=self.guess_zip).grid(row=len(rows3) + 1, column=1, sticky="w", pady=6, padx=8)
+        self.zipmsg.grid(row=len(rows3) + 2, column=1, sticky="w", padx=8)
         # ---- ผู้ลงนาม + ลายเซ็น (ดูตัวอย่างจริง ลากลายเซ็นไปวางได้)
         f2 = ttk.Frame(nb, padding=16)
         nb.add(f2, text="  ผู้ลงนาม / ลายเซ็น  ")
@@ -184,6 +203,14 @@ class SettingsWin(Page):
         ttk.Button(self, text="บันทึกการตั้งค่า", style="Accent.TButton", command=self.save).pack(side="bottom", anchor="e", pady=10)
         nb.pack(fill="both", expand=True)
         self.switch()
+
+    def guess_zip(self):
+        a = self.v["unit_amphoe"].get().strip() or self.v["amphoe"].get().strip()
+        p = self.v["unit_province"].get().strip() or self.v["province"].get().strip()
+        z = core.zip_lookup(p, a)
+        if z:
+            self.v["unit_zip"].set(z)
+        self.zipmsg.config(text=("พบ %s" % z) if z else "ไม่พบรหัสของ อ.%s จ.%s — กรอกเอง" % (a, p))
 
     # ---- ตัวแก้ไขผู้ลงนาม
     def switch(self):
@@ -662,7 +689,8 @@ class RecordWin(Page):
 
 # ====================================================================== 2/4/5) พิมพ์
 class PrintWin(Page):
-    TITLES = {"reg": "จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "บัญชีสรุปผลการตรวจสอบ", "send": "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ"}
+    TITLES = {"reg": "จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "บัญชีสรุปผลการตรวจสอบ", "send": "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
+              "form": "แบบพิมพ์รายบุคคล", "env": "จ่าหน้าซองจดหมาย (DL)"}
 
     def __init__(self, app, kind):
         super().__init__(app)
@@ -686,7 +714,15 @@ class PrintWin(Page):
         r = 0
         ttk.Label(g, text="ประเภททหาร").grid(row=r, column=0, sticky="w", pady=3)
         ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + core.TYPES, state="readonly", width=40).grid(row=r, column=1, sticky="w")
-        if kind != "send":
+        if kind == "form":
+            r += 1
+            ttk.Label(g, text="ชนิดงานพิมพ์").grid(row=r, column=0, sticky="w", pady=3)
+            self.sub = tk.StringVar(value="แบบพิมพ์ (A4 แนวตั้ง 1 หน้า/คน)")
+            cs = ttk.Combobox(g, textvariable=self.sub, state="readonly", width=40,
+                              values=["แบบพิมพ์ (A4 แนวตั้ง 1 หน้า/คน)", "จ่าหน้าซอง (DL 220×110 มม. 1 ซอง/คน)"])
+            cs.grid(row=r, column=1, sticky="w")
+            cs.bind("<<ComboboxSelected>>", lambda e: self.set_sub())
+        elif kind != "send":
             r += 1
             ttk.Label(g, text="ผู้ลงนามระดับ").grid(row=r, column=0, sticky="w", pady=3)
             ttk.Combobox(g, textvariable=self.level, values=core.LEVELS, state="readonly", width=12).grid(row=r, column=1, sticky="w")
@@ -731,6 +767,10 @@ class PrintWin(Page):
         self.upd()
         self.pump()
 
+    def set_sub(self):
+        self.kind = "env" if self.sub.get().startswith("จ่าหน้า") else "form"
+        self.upd()
+
     def post(self, fn, *a):
         self.q.put((fn, a))
 
@@ -746,7 +786,7 @@ class PrintWin(Page):
 
     # ---- ช่วย
     def mark_key(self):
-        return "sum" if self.kind == "sum" else "send" if self.kind == "send" else "reg_" + self.level.get()
+        return self.kind if self.kind in ("sum", "send", "form", "env") else "reg_" + self.level.get()
 
     def sel(self, tam=None, moo=None):
         return self.db.select(self.ptype.get(), tam or self.tam.get(), moo if moo is not None else (None if self.moo.get() == "ทั้งหมด" else self.moo.get()),
@@ -831,6 +871,12 @@ class PrintWin(Page):
         jobs = self.jobs(mode)
         if not jobs:
             return err("ไม่มีรายชื่อตามเงื่อนไข")
+        if self.kind in ("form", "env"):
+            st = self.app.st
+            miss = [n for k, n in (("sad_tel", "เบอร์โทรสัสดี"), ("deadline", "วันส่งคืน")) if not st.get(k)] if self.kind == "form" else \
+                   [n for k, n in (("unit_province", "จังหวัดของหน่วย"),) if not (st.get(k) or st.get("province"))]
+            if miss and not messagebox.askyesno("ข้อมูลยังไม่ครบ", "ยังไม่ได้กรอกในตั้งค่า: %s\nจะพิมพ์ช่องนั้นเป็นค่าว่าง ต้องการพิมพ์ต่อไหม?" % ", ".join(miss)):
+                return
         if os.name != "nt":
             return err("การพิมพ์ใช้ได้เฉพาะบน Windows (ดูตัวอย่างใช้ได้ทุกระบบ)")
         if not messagebox.askyesno("ยืนยัน", "จะพิมพ์ %d ชุด รวม %d คน × %d ฉบับ\nเครื่องพิมพ์: %s\nเริ่มเลยไหม?" % (
@@ -1025,7 +1071,8 @@ class HomePage(Page):
                  ("2", "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ", "แบบเดียวกับบัญชีสรุป (A4 แนวนอน) ช่อง G-I ว่างให้กรอก มีตัวอย่างลำดับที่ 1", "send", "#7A4FD6"),
                  ("3", "บันทึกผลการตรวจสอบสภาพ", "ค้นด้วยเลขบัตร/ชื่อ กรอก มีตัว-ไม่มีตัว อาชีพ สถานที่ จังหวัด อำเภอ เบอร์โทร", "record", GREEN),
                  ("4", "จัดพิมพ์บัญชีตรวจสอบสภาพ", "เลือกประเภททหาร ระดับผู้ลงนาม ตำบล พิมพ์เรียงหมู่ ทีละตำบล/หมู่", "reg", "#D98A00"),
-                 ("5", "บัญชีสรุปผลการตรวจสอบ", "เลือกประเภท (รวมทุกประเภท) ตำบล ผู้ลงนาม และจำนวนชุด", "sum", "#C2410C")]
+                 ("5", "บัญชีสรุปผลการตรวจสอบ", "เลือกประเภท (รวมทุกประเภท) ตำบล ผู้ลงนาม และจำนวนชุด", "sum", "#C2410C"),
+                 ("6", "แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "A4 1 หน้า/คน ให้ผู้ใหญ่บ้านกรอก และซอง DL พร้อมรหัสไปรษณีย์ระดับตำบล (ข้อมูลหน่วยกรอกที่ตั้งค่า)", "form", "#0E7490")]
         for i, (num, t, d, key, col) in enumerate(items):
             grid.columnconfigure(i % 2, weight=1, uniform="c")
             Card(grid, num, t, d, lambda k=key: app.nav(k), col).grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
@@ -1189,7 +1236,7 @@ class App(tk.Tk):
         tk.Label(head, text="ZAIA\nPrepare Personal", bg=NAVY, fg="white", font=(f, 13, "bold"), justify="left").pack(side="left", padx=10)
         self.navbtn = {}
         for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("send", "2  ส่งผู้ใหญ่บ้านตรวจสอบ"),
-                         ("record", "3  บันทึกผลการตรวจสอบ"), ("reg", "4  พิมพ์บัญชีตรวจสอบสภาพ"), ("sum", "5  บัญชีสรุปผลการตรวจสอบ")):
+                         ("record", "3  บันทึกผลการตรวจสอบ"), ("reg", "4  พิมพ์บัญชีตรวจสอบสภาพ"), ("sum", "5  บัญชีสรุปผลการตรวจสอบ"), ("form", "6  แบบพิมพ์รายบุคคล / ซอง")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
         tk.Frame(self.side, bg="#34466E", height=1).pack(fill="x", padx=18, pady=14)
         self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
@@ -1219,10 +1266,10 @@ class App(tk.Tk):
 
     TITLES = {"home": "หน้าแรก", "import": "1  นำเข้าข้อมูลจากไฟล์ Excel", "send": "2  ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
               "record": "3  บันทึกผลการตรวจสอบสภาพ", "reg": "4  จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "5  บัญชีสรุปผลการตรวจสอบ",
-              "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
+              "form": "6  แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
 
     def nav(self, key):
-        if key in ("send", "record", "reg", "sum") and not self.db.persons:
+        if key in ("send", "record", "reg", "sum", "form") and not self.db.persons:
             messagebox.showinfo("ยังไม่มีข้อมูล", "กรุณานำเข้าข้อมูลจาก Excel ก่อน (ขั้นตอน 1)")
             key = "import"
         if self.cur is not None:
@@ -1234,7 +1281,7 @@ class App(tk.Tk):
                 pass
         self.unbind("<Escape>")
         mk = {"home": lambda: HomePage(self), "import": lambda: ImportWin(self), "record": lambda: RecordWin(self),
-              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"),
+              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"), "form": lambda: PrintWin(self, "form"),
               "settings": lambda: SettingsWin(self), "update": lambda: UpdateWin(self)}
         self.set_title(self.TITLES[key])
         self.cur = mk[key]()
