@@ -432,11 +432,117 @@ def patch_sheet_xml(xml, edits):
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
-def write_back(db, backup=True, log=None):
-    """เขียนเฉพาะช่องผลตรวจที่เปลี่ยน กลับไฟล์ต้นฉบับ คืน (จำนวนเซลล์, ที่อยู่ไฟล์สำรอง)"""
+class ExcelError(Exception):
+    def __init__(self, msg, code="FAIL"):
+        super().__init__(msg)
+        self.code = code
+
+
+_PS_SCRIPT = r"""param([string]$Path,[string]$Json)
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding=[Text.Encoding]::UTF8
+$d = Get-Content -Raw -Encoding UTF8 $Json | ConvertFrom-Json
+try { $xl = New-Object -ComObject Excel.Application } catch { Write-Error 'NOEXCEL'; exit 3 }
+$pre = $xl.Workbooks.Count
+if ($pre -eq 0) { $xl.Visible=$false }
+$oldAlerts = $xl.DisplayAlerts
+$xl.DisplayAlerts=$false
+$wb = $null
+try {
+  $wb = $xl.Workbooks.Open($Path, 0, $false)
+  if ($wb.ReadOnly) { throw 'READONLY' }
+  $ws = $wb.Worksheets.Item([string]$d.sheet)
+  $n = 0
+  foreach ($e in @($d.edits)) {
+    $r = $ws.Range([string]$e.a)
+    $v = [string]$e.v
+    if ($v -eq '') { [void]$r.ClearContents() }
+    elseif ($r.NumberFormat -eq '@') { $r.Value2 = $v }
+    else { $r.Value2 = "'" + $v }
+    $n++
+  }
+  $wb.Save()
+  Write-Output "OK $n"
+} finally {
+  if ($wb -ne $null) { try { $wb.Close($false) } catch {} }
+  $xl.DisplayAlerts = $oldAlerts
+  if ($xl.Workbooks.Count -eq 0) { $xl.Quit() }
+  [void][Runtime.InteropServices.Marshal]::ReleaseComObject($xl)
+}
+"""
+
+
+def _collect_edits(db):
+    mapping = db.source.get("mapping", {})
+    edits = {}
+    for p in db.persons:
+        for k in RESULT_FIELDS:
+            c = mapping.get(k)
+            if not c or not p.get("_row"):
+                continue
+            if p.get(k, "") != p.get("_orig", {}).get(k, ""):
+                edits[(p["_row"], c)] = p.get(k, "")
+    return edits
+
+
+def write_back_excel(db, backup=True):
+    """เขียนผลกลับไฟล์ .xlsb (หรือไฟล์ใดก็ได้) ด้วย Microsoft Excel ผ่าน COM (PowerShell) แล้วบันทึกเป็นรูปแบบเดิม
+    ไม่พึ่งไลบรารีเพิ่ม คืน (จำนวนเซลล์, ไฟล์สำรอง)"""
+    import json
+    import subprocess
+    path, sheet = db.source.get("path"), db.source.get("sheet")
+    if not path or not os.path.exists(path):
+        raise FileNotFoundError("ไม่พบไฟล์ต้นฉบับ: %s" % path)
+    edits = _collect_edits(db)
+    if not edits:
+        return 0, ""
+    try:                                                    # ไฟล์ที่เปิดค้างใน Excel จะถูกล็อก
+        with open(path, "r+b"):
+            pass
+    except PermissionError:
+        raise ExcelError("ไฟล์นี้เปิดค้างอยู่ใน Excel หรือโปรแกรมอื่น กรุณาปิดไฟล์ก่อนแล้วกดเขียนผลกลับใหม่", "LOCKED")
+    bak = ""
+    if backup:
+        base, ext = os.path.splitext(path)
+        bak = "%s.สำรอง-%s%s" % (base, time.strftime("%Y%m%d-%H%M%S"), ext)
+        shutil.copy2(path, bak)
+    td = tempfile.mkdtemp(prefix="zaia_xl_")
+    try:
+        ps1, js = os.path.join(td, "w.ps1"), os.path.join(td, "e.json")
+        with open(ps1, "w", encoding="utf-8-sig") as f:
+            f.write(_PS_SCRIPT)
+        with open(js, "w", encoding="utf-8-sig") as f:
+            json.dump({"sheet": sheet, "edits": [{"a": "%s%d" % (col_letter(c) if isinstance(c, int) else c, r), "v": v} for (r, c), v in edits.items()]}, f, ensure_ascii=False)
+        flags = 0x08000000 if os.name == "nt" else 0         # CREATE_NO_WINDOW
+        try:
+            pr = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1, "-Path", path, "-Json", js],
+                                capture_output=True, timeout=600, creationflags=flags)
+        except FileNotFoundError:
+            raise ExcelError("ไม่พบ PowerShell ในเครื่อง", "NOEXCEL")
+        out = (pr.stdout or b"").decode("utf-8", "replace").strip()
+        errt = (pr.stderr or b"").decode("utf-8", "replace").strip()
+        if pr.returncode != 0 or "OK " not in out:
+            if "NOEXCEL" in errt or pr.returncode == 3:
+                raise ExcelError("ไม่พบ Microsoft Excel ในเครื่อง", "NOEXCEL")
+            if "READONLY" in errt:
+                raise ExcelError("เปิดไฟล์แบบแก้ไขไม่ได้ (เปิดค้างอยู่ หรือไฟล์เป็นแบบอ่านอย่างเดียว) กรุณาปิดไฟล์ก่อน", "LOCKED")
+            raise ExcelError("Excel เขียนไม่สำเร็จ: %s" % (errt or out or "รหัส %s" % pr.returncode)[:600])
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
+    for p in db.persons:
+        p["_orig"] = {k: p.get(k, "") for k in RESULT_FIELDS}
+    db.save()
+    return len(edits), bak
+
+
+def write_back(db, backup=True, log=None, xlsb_export=False):
+    """เขียนเฉพาะช่องผลตรวจที่เปลี่ยน กลับไฟล์ต้นฉบับ คืน (จำนวนเซลล์, ที่อยู่ไฟล์สำรอง)
+    .xlsb: เขียนผ่าน Excel ลงไฟล์เดิม (xlsb_export=True = สร้าง .xlsx ใหม่แทน)"""
     src = db.source
     if is_xlsb(src.get("path", "")) and db.dirty_count():
-        return -1, export_xlsb_as_xlsx(db)
+        if xlsb_export:
+            return -1, export_xlsb_as_xlsx(db)
+        return write_back_excel(db, backup)
     path, sheet, mapping = src.get("path"), src.get("sheet"), src.get("mapping", {})
     if not path or not os.path.exists(path):
         raise FileNotFoundError("ไม่พบไฟล์ต้นฉบับ: %s" % path)

@@ -1258,14 +1258,30 @@ class App(tk.Tk):
         if not n:
             return messagebox.showinfo("เขียนกลับ", "ไม่มีผลที่เปลี่ยนจากไฟล์ต้นฉบับ")
         if core.is_xlsb(self.db.source.get("path", "")):
-            if not messagebox.askyesno("ไฟล์ .xlsb", "ต้นฉบับเป็น .xlsb เขียนกลับตรง ๆ ไม่ได้\nจะสร้างไฟล์ .xlsx ใหม่ข้างไฟล์เดิม (ค่าล้วน ไม่มีรูปแบบ/มาโคร) ต่อไหม?"):
+            if not messagebox.askyesno("เขียนผลกลับไฟล์ .xlsb", "จะเขียนผลของ %d คน ลงไฟล์ .xlsb เดิมผ่าน Microsoft Excel:\n%s\nชีต: %s\n\nแก้เฉพาะช่องผลตรวจ ส่วนอื่นไม่ถูกแตะ (บันทึกเป็น .xlsb เหมือนเดิม)\nต้องปิดไฟล์นี้ใน Excel ก่อน — ต่อไหม?\n%s" % (
+                    n, self.db.source.get("path"), self.db.source.get("sheet"),
+                    "ระบบจะสำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน" if self.st.get("backup", True) else "⚠ ปิดการสำรองไฟล์ไว้")):
                 return
+            self.config(cursor="watch")
+            self.update_idletasks()
             try:
-                cells, bak = core.write_back(self.db)
+                cells, bak = core.write_back(self.db, self.st.get("backup", True))
+            except core.ExcelError as e:
+                self.config(cursor="")
+                if e.code == "NOEXCEL" and messagebox.askyesno("ไม่พบ Excel", "%s\nสร้างไฟล์ .xlsx ใหม่ข้างไฟล์เดิมแทน (ค่าล้วน ไม่มีรูปแบบ/มาโคร) ไหม?" % e):
+                    try:
+                        cells, bak = core.write_back(self.db, xlsb_export=True)
+                    except Exception as e2:
+                        return err("ส่งออกไม่สำเร็จ: %s" % e2)
+                    self.refresh_status()
+                    return messagebox.showinfo("สำเร็จ", "สร้างไฟล์ใหม่แล้ว:\n%s\nไฟล์ .xlsb เดิมไม่ถูกแก้" % bak)
+                return err("เขียนกลับไม่สำเร็จ: %s" % e) if e.code != "NOEXCEL" else None
             except Exception as e:
-                return err("ส่งออกไม่สำเร็จ: %s" % e)
+                self.config(cursor="")
+                return err("เขียนกลับไม่สำเร็จ: %s" % e)
+            self.config(cursor="")
             self.refresh_status()
-            return messagebox.showinfo("สำเร็จ", "สร้างไฟล์ใหม่แล้ว:\n%s\nไฟล์ .xlsb เดิมไม่ถูกแก้" % bak)
+            return messagebox.showinfo("สำเร็จ", "เขียน %d เซลล์ลงไฟล์ .xlsb เดิมแล้ว%s" % (cells, ("\nสำรองไว้ที่: " + bak) if bak else ""))
         if not messagebox.askyesno("เขียนผลกลับไฟล์ต้นฉบับ", "จะเขียนผลของ %d คน ลงไฟล์:\n%s\nชีต: %s\n\nแก้เฉพาะช่องผลตรวจ (มี/ไม่มี สถานภาพ สถานที่ อำเภอ จังหวัด เบอร์โทร) ส่วนอื่นไม่ถูกแตะ\n%s" % (
                 n, self.db.source.get("path"), self.db.source.get("sheet"),
                 "ระบบจะสำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน" if self.st.get("backup", True) else "⚠ ปิดการสำรองไฟล์ไว้")):

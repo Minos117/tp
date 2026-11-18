@@ -1,4 +1,4 @@
-ZAIA Prepare Personal  1.0.6 (Stable)
+ZAIA Prepare Personal  1.0.7 (Stable)
 ==============================================
 สร้างเป็นโปรแกรม Windows + ไฟล์ Setup:
   1) แตก ZIP นี้ไว้ที่ใดก็ได้ (พาธไม่ควรมีอักขระแปลก)

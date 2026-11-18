@@ -1,10 +1,10 @@
 {
- "version": "1.0.6",
+ "version": "1.0.7",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.6",
+  "version": "1.0.7",
   "files": [
    {
     "path": "assets/logo.ico",
@@ -27,8 +27,8 @@
    {
     "path": "zaia/core.py",
     "url": "zaia/core.py",
-    "sha256": "185f0841e93860a24fed848f9c9b96fd1bc0c09c873163eccf940dcb66398ccd",
-    "size": 20718
+    "sha256": "374337a2922fe61d8cf6a3fcb82faa3c98c0de4e9ed236c8ee5c49f4b2171545",
+    "size": 25825
    },
    {
     "path": "zaia/geo_th.json",
@@ -51,8 +51,8 @@
    {
     "path": "zaia/ui.py",
     "url": "zaia/ui.py",
-    "sha256": "3c80125d30a5d04dd224bd886911ef675ab754ecf24ec034adf0a4cd2e09d5b6",
-    "size": 74389
+    "sha256": "859ad15db1553332f05af6b60c28e6df132b06361cfc59d9812b9eb2c4849437",
+    "size": 76057
    },
    {
     "path": "zaia/updater.py",
@@ -63,7 +63,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "d6780cd915869c55ff7308b1102d220c2d5c3c73f14dbafc3dd918fb8a079979",
+    "sha256": "ccdf3f56dd1dc05a82f6231b54decd34d7551a8f0d434c232792380a52c1f552",
     "size": 888
    }
   ]
