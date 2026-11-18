@@ -14,7 +14,7 @@ for f in glob.glob('zaia/*.py'):
 hidden = sorted({m for m in mods if m.split('.')[0] != 'zaia'} | {
     'tkinter', 'tkinter.ttk', 'tkinter.filedialog', 'tkinter.messagebox', 'tkinter.font',
     'PIL._tkinter_finder', 'lxml._elementpath', 'win32api', 'win32ui', 'win32print', 'win32gui', 'win32con',
-    'ctypes', 'glob', 'zipfile', 'urllib.request', 'urllib.parse', 'hashlib', 'queue', 'threading'})
+    'ctypes', 'ctypes.wintypes', 'glob', 'zipfile', 'urllib.request', 'urllib.parse', 'hashlib', 'queue', 'threading'})
 for pkg in ('openpyxl', 'PIL', 'pyxlsb', 'lxml'):
     hidden += collect_submodules(pkg)
 

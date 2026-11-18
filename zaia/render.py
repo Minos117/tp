@@ -258,7 +258,7 @@ class GdiPrinter:
         """ลายเซ็น: ส่งภาพ DIB ตรงไปเครื่องพิมพ์ด้วย StretchDIBits (ไดรเวอร์เครื่องพิมพ์รองรับกว่า BitBlt จาก memory DC)
         โหมด SRCAND: พื้นขาวไม่ทับตัวอักษรข้างใต้ ถ้าไดรเวอร์ไม่รับ SRCAND จะลองแบบ SRCCOPY (พื้นขาว) แทน"""
         import ctypes
-        from ctypes import wintypes
+        c = ctypes
         from PIL import Image
         _, path, x, y, w, h = op
         pw, ph = max(1, int(w * kx)), max(1, int(h * ky))
@@ -269,18 +269,18 @@ class GdiPrinter:
         raw = bg.convert("RGB").tobytes("raw", "BGRX")
 
         class BIH(ctypes.Structure):
-            _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
-                        ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD),
-                        ("biSizeImage", wintypes.DWORD), ("biXPelsPerMeter", wintypes.LONG), ("biYPelsPerMeter", wintypes.LONG),
-                        ("biClrUsed", wintypes.DWORD), ("biClrImportant", wintypes.DWORD)]
+            _fields_ = [("biSize", c.c_uint32), ("biWidth", c.c_int32), ("biHeight", c.c_int32),
+                        ("biPlanes", c.c_uint16), ("biBitCount", c.c_uint16), ("biCompression", c.c_uint32),
+                        ("biSizeImage", c.c_uint32), ("biXPelsPerMeter", c.c_int32), ("biYPelsPerMeter", c.c_int32),
+                        ("biClrUsed", c.c_uint32), ("biClrImportant", c.c_uint32)]
         bih = BIH(40, sw, -sh, 1, 32, 0, len(raw), 0, 0, 0, 0)         # ความสูงติดลบ = เรียงบนลงล่าง
         buf = ctypes.create_string_buffer(raw, len(raw))
         gdi = ctypes.windll.gdi32
-        gdi.StretchDIBits.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        gdi.StretchDIBits.argtypes = [c.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                       ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
-                                      ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT, wintypes.DWORD]
+                                      ctypes.c_void_p, ctypes.c_void_p, c.c_uint, c.c_uint32]
         gdi.StretchDIBits.restype = ctypes.c_int
-        gdi.SetStretchBltMode.argtypes = [wintypes.HDC, ctypes.c_int]
+        gdi.SetStretchBltMode.argtypes = [c.c_void_p, ctypes.c_int]
         hdc = self.dc.GetSafeHdc()
         gdi.SetStretchBltMode(hdc, 4)                                  # HALFTONE
         for rop in (0x008800C6, 0x00CC0020):                           # SRCAND แล้วค่อย SRCCOPY
