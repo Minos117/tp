@@ -1028,7 +1028,7 @@ class RecordWin(Page):
         self.cur = p
         self.head.config(text="%s%s  %s" % (p["rank"], p["name"], p["surname"]))
         self.sub.config(text="เลขบัตร %s   |   %s ม.%s ต.%s อ.%s จ.%s   |   %s" % (
-            p["nid"], p["house"], p["moo"], p["tambon"], p["amphoe"], p["province"], p["type"]))
+            layout.fmt_nid(p["nid"]), p["house"], p["moo"], p["tambon"], p["amphoe"], p["province"], p["type"]))
         self.v["result"].set(p.get("result", ""))
         st = p.get("status", "")
         occ, det = st, ""

@@ -62,6 +62,14 @@ def tp(st, kind):
     return d
 
 
+def fmt_nid(v):
+    """เลขบัตรประชาชน 13 หลัก -> 0 0000 00000 00 0 (ถ้าไม่ใช่ 13 หลักคืนค่าเดิม)"""
+    s = "".join(ch for ch in str(v or "") if ch.isdigit())
+    if len(s) != 13:
+        return str(v or "")
+    return "%s %s %s %s %s" % (s[0], s[1:5], s[5:10], s[10:12], s[12])
+
+
 def fmt(text, **kw):
     for k, v in kw.items():
         text = text.replace("{%s}" % k, str(v))
@@ -294,7 +302,7 @@ def build_reg(ctx):
             _t(pg, xs[0], y, cw[0], Lh, n, "c", pt)
             _t(pg, xs[1], y, cw[1], Lh, _p(p, "rank") + _p(p, "name"), "l", pt)
             _t(pg, xs[1], y + Lh, cw[1], Lh, _p(p, "surname"), "c", pt)
-            _t(pg, xs[1], y + 2 * Lh, cw[1], Lh, _p(p, "nid"), "c", pt)
+            _t(pg, xs[1], y + 2 * Lh, cw[1], Lh, fmt_nid(_p(p, "nid")), "c", pt)
             _t(pg, xs[2], y, cw[2], Lh, _p(p, "year"), "c", pt)
             _t(pg, xs[2], y + Lh, cw[2], Lh, _p(p, "mark"), "c", pt)
             _t(pg, xs[2], y + 2 * Lh, cw[2], Lh, _p(p, "branch"), "c", pt)
@@ -421,7 +429,7 @@ def build_table(ctx):
                 sta = ("", "", "")
             else:
                 sta = (_p(p, "status"), _p(p, "place"), ("อ.%s จ.%s" % (_p(p, "amphoe2"), _p(p, "prov2"))) if (_p(p, "amphoe2") or _p(p, "prov2")) else "")
-            lines3(y, (seq, "", ""), _p(p, "rank") + _p(p, "name"), _p(p, "surname"), _p(p, "nid"),
+            lines3(y, (seq, "", ""), _p(p, "rank") + _p(p, "name"), _p(p, "surname"), fmt_nid(_p(p, "nid")),
                    (_p(p, "year"), _p(p, "mark"), _p(p, "branch")), res,
                    ("บ้านเลขที่ %s ม.%s" % (_p(p, "house"), _p(p, "moo")), "ต." + _p(p, "tambon"), "อ.%s จ.%s" % (_p(p, "amphoe"), _p(p, "province"))),
                    tel, sta, ("", "", ""))
@@ -483,7 +491,7 @@ def build_form(ctx):
         lab(8, 8, 5, "สกุล", "c"); val(9, 12, 5, _p(p, "surname"), bold=True)
         lab(1, 3, 6, "เครื่องหมาย", "r"); val(4, 9, 6, ("%s %s" % (_p(p, "year"), _p(p, "mark"))).strip(), bold=True)
         lab(10, 10, 6, "เหล่า"); val(11, 13, 6, _p(p, "branch"))
-        lab(1, 5, 7, "หมายเลขประจำตัวประชาชน", "r", False); val(6, 11, 7, _p(p, "nid"))
+        lab(1, 5, 7, "หมายเลขประจำตัวประชาชน", "r", False); val(6, 11, 7, fmt_nid(_p(p, "nid")))
         lab(1, 2, 8, "บิดาชื่อ", "r", False); val(3, 6, 8, (_p(p, "father") + " " + _p(p, "fsur")).strip())
         lab(7, 8, 8, "มารดาชื่อ", "r"); val(9, 12, 8, (_p(p, "mother") + " " + _p(p, "msur")).strip())
         lab(1, 5, 9, "2. ภูมิลำเนาทหารอยู่บ้านเลขที่"); val(6, 7, 9, _p(p, "house"))
