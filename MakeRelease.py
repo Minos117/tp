@@ -1,5 +1,5 @@
 r"""สร้าง release\update.json (SHA-256 ของทุกไฟล์ใน dist) + คัดลอกไฟล์ไป release\files\
-ตรวจว่า APP_VER (zaia/version.py) = AppVersion (installer.iss) ก่อนเสมอ  ใช้: python MakeRelease.py [BASE_URL]
+ตรวจว่า APP_VER (zaia/version.py) >= AppVersion (installer.iss = รุ่นฐาน) ก่อนเสมอ  ใช้: python MakeRelease.py [BASE_URL]
 อัปโหลดทั้งโฟลเดอร์ release ไปที่ GitHub (ต้องได้รับอนุมัติก่อนเผยแพร่ครั้งแรก)"""
 import hashlib
 import json
@@ -24,8 +24,9 @@ def main():
     ver = grab(os.path.join(ROOT, "zaia", "version.py"), r'^APP_VER\s*=\s*"([^"]+)"')
     rev = int(grab(os.path.join(ROOT, "zaia", "version.py"), r"^SETUP_REV\s*=\s*(\d+)"))
     iss = grab(os.path.join(ROOT, "installer.iss"), r"^AppVersion=(.+)$").strip()
-    if ver != iss:
-        sys.exit("เวอร์ชันไม่ตรงกัน: APP_VER=%s แต่ installer.iss AppVersion=%s" % (ver, iss))
+    vt = lambda v: tuple(int(x) for x in v.split("."))
+    if vt(ver) < vt(iss):      # installer.iss = รุ่นฐานของตัวติดตั้ง (1.0.2) ; APP_VER ขึ้นตามแพตช์ได้ แต่ห้ามต่ำกว่า
+        sys.exit("APP_VER=%s ต่ำกว่า installer.iss AppVersion=%s" % (ver, iss))
     if not os.path.isdir(DIST):
         sys.exit("ยังไม่มี dist (ให้รัน build_all.bat ก่อน)")
     shutil.rmtree(OUT, ignore_errors=True)
