@@ -1630,6 +1630,348 @@ class UpdateWin(Page):
             self.app.destroy()
 
 
+# ====================================================================== 7) เขียนผลกลับ / 8) ล้างข้อมูล (หน้าแสดงความคืบหน้าแบบ Windows XP)
+class XPAnim(tk.Canvas):
+    """อนิเมชันแบบกล่องคัดลอกไฟล์ของ Windows XP: กระดาษบินจากโฟลเดอร์ไปปลายทาง (ไฟล์ Excel หรือถังขยะ)"""
+
+    def __init__(self, parent, dest="excel", width=520, height=120):
+        super().__init__(parent, width=width, height=height, highlightthickness=1, highlightbackground=luna.LINE_D, bg="white")
+        self.dest, self.W, self.H = dest, width, height
+        self.state, self.t0, self._job, self._bump = "idle", 0.0, None, 0.0
+        self.draw_all(0.0)
+
+    def start(self):
+        self.state, self.t0 = "run", time.time()
+        if self._job is None:
+            self._tick()
+
+    def stop(self, ok=True):
+        self.state = "done" if ok else "fail"
+        if self._job is not None:
+            self.after_cancel(self._job)
+            self._job = None
+        self.draw_all(0.0)
+
+    def reset(self):
+        self.state = "idle"
+        self.draw_all(0.0)
+
+    def _tick(self):
+        if self.state != "run":
+            self._job = None
+            return
+        self.draw_all(time.time() - self.t0)
+        self._job = self.after(40, self._tick)
+
+    # ---- ของที่วาด
+    def folder(self, x, y, s=1.0):
+        c = self.create_polygon
+        c(x, y + 10 * s, x, y + 52 * s, x + 66 * s, y + 52 * s, x + 66 * s, y + 10 * s, x + 30 * s, y + 10 * s, x + 24 * s, y + 2 * s, x + 4 * s, y + 2 * s,
+          fill="#E9B93C", outline="#A87B10")
+        c(x, y + 20 * s, x + 66 * s, y + 20 * s, x + 66 * s, y + 52 * s, x, y + 52 * s, fill="#F8DA6E", outline="#A87B10")
+        self.create_line(x + 2, y + 22 * s, x + 64 * s, y + 22 * s, fill="#FFF3B8")
+
+    def sheet(self, x, y, w=22, h=28, lines=True):
+        self.create_polygon(x, y, x + w - 7, y, x + w, y + 7, x + w, y + h, x, y + h, fill="white", outline="#5B6F94")
+        self.create_polygon(x + w - 7, y, x + w - 7, y + 7, x + w, y + 7, fill="#D6E0F2", outline="#5B6F94")
+        if lines:
+            for i in range(4):
+                self.create_line(x + 4, y + 10 + i * 4, x + w - 4, y + 10 + i * 4, fill="#7D96C8")
+
+    def draw_dest(self, dx, dy):
+        if self.dest == "excel":
+            self.create_polygon(dx, dy, dx + 40, dy, dx + 52, dy + 12, dx + 52, dy + 64, dx, dy + 64, fill="white", outline="#1D6F42", width=2)
+            self.create_polygon(dx + 40, dy, dx + 40, dy + 12, dx + 52, dy + 12, fill="#CFE8D8", outline="#1D6F42")
+            self.create_rectangle(dx + 6, dy + 18, dx + 34, dy + 48, fill="#1D8A4C", outline="#14663A")
+            self.create_text(dx + 20, dy + 33, text="X", fill="white", font=("Arial", 18, "bold"))
+            for i in range(3):
+                self.create_line(dx + 38, dy + 24 + i * 8, dx + 48, dy + 24 + i * 8, fill="#7FB899")
+        else:
+            self.create_polygon(dx + 6, dy + 16, dx + 46, dy + 16, dx + 40, dy + 64, dx + 12, dy + 64, fill="#CFDAEC", outline="#5E7396", width=2)
+            for i in range(1, 4):
+                self.create_line(dx + 12 + i * 9 - 4, dy + 22, dx + 14 + i * 7 - 2, dy + 60, fill="#8FA3C4")
+            self.create_rectangle(dx + 2, dy + 8, dx + 50, dy + 16, fill="#B7C6DE", outline="#5E7396", width=2)
+            self.create_rectangle(dx + 18, dy + 3, dx + 34, dy + 8, fill="#B7C6DE", outline="#5E7396")
+
+    def draw_all(self, t):
+        self.delete("all")
+        W, H = self.W, self.H
+        for x in range(0, W, 4):                                   # พื้นไล่สีฟ้าอ่อนแบบหน้าต่างคัดลอกไฟล์ XP
+            self.create_line(x, 0, x, H, fill=luna.mix("#FFFFFF", luna.BLUE, 0.06 + 0.12 * x / W))
+        sx, dx = 40, W - 100
+        self.folder(sx, 38)
+        bump = 0
+        if self.state == "run":
+            period = 1.9
+            for i in range(5):
+                u = ((t / period) + i / 5.0) % 1.0
+                if 0.06 < u < 0.94:
+                    px = sx + 56 + (dx - sx - 40) * u
+                    py = 62 - 44 * (1 - (2 * u - 1) ** 2) - 6 * u
+                    self.sheet(px, py)
+                if 0.9 < u < 0.97:
+                    bump = 3
+        else:
+            for i in range(3):
+                self.sheet(sx + 16 + i * 2, 30 - i * 2, lines=(i == 2))
+            self.folder(sx, 38)
+        self.draw_dest(dx, 28 + bump)
+        if self.state == "done":
+            self.create_oval(dx + 28, 80, dx + 56, 108, fill="#2E9B3E", outline="white", width=2)
+            self.create_line(dx + 35, 94, dx + 41, 100, dx + 51, 87, fill="white", width=3)
+        elif self.state == "fail":
+            self.create_oval(dx + 28, 80, dx + 56, 108, fill="#D13A2E", outline="white", width=2)
+            self.create_line(dx + 36, 88, dx + 48, 100, fill="white", width=3)
+            self.create_line(dx + 48, 88, dx + 36, 100, fill="white", width=3)
+
+
+class XPBar(tk.Canvas):
+    """แถบความคืบหน้าแบบ XP: ช่องสี่เหลี่ยมสีเขียววิ่งไปมา (ไม่ทราบเวลา) หรือเต็มเมื่อเสร็จ"""
+
+    def __init__(self, parent, width=520, height=22):
+        super().__init__(parent, width=width, height=height, highlightthickness=1, highlightbackground=luna.LINE_D, bg="white")
+        self.W, self.H, self.mode, self._job, self.t0 = width, height, "idle", None, 0.0
+        self.bind("<Configure>", lambda e: self.draw())
+        self.draw()
+
+    def start(self):
+        self.mode, self.t0 = "run", time.time()
+        if self._job is None:
+            self._tick()
+
+    def stop(self, full=True):
+        self.mode = "full" if full else "idle"
+        if self._job is not None:
+            self.after_cancel(self._job)
+            self._job = None
+        self.draw()
+
+    def _tick(self):
+        if self.mode != "run":
+            self._job = None
+            return
+        self.draw()
+        self._job = self.after(50, self._tick)
+
+    def draw(self):
+        self.delete("all")
+        w, h = max(40, self.winfo_width()), self.H
+        bw, gap = 9, 3
+        n = (w - 6) // (bw + gap)
+        if self.mode == "full":
+            idx = range(n)
+        elif self.mode == "run":
+            head = int((time.time() - self.t0) * 14) % (n + 4)
+            idx = [i for i in range(head - 4, head) if 0 <= i < n]
+        else:
+            idx = []
+        for i in idx:
+            x = 3 + i * (bw + gap)
+            self.create_rectangle(x, 3, x + bw, h - 3, fill=luna.BTN, outline="")
+            self.create_line(x, 3, x + bw, 3, fill=luna.mix(luna.BTN, "#FFFFFF", 0.5))
+
+
+class RunPage(Page):
+    """หน้าแสดงการทำงาน: อนิเมชัน + แถบความคืบหน้า + log พื้นดำ"""
+
+    def __init__(self, app, dest, head, intro):
+        super().__init__(app)
+        self.app, self.db, self.running = app, app.db, False
+        vs = VScroll(self)
+        vs.pack(fill="both", expand=True)
+        self.body = ttk.Frame(vs.inner, padding=(2, 0, 10, 6))
+        self.body.pack(fill="both", expand=True)
+        ttk.Label(self.body, text=head, font=(app.ui_font, 15, "bold"), foreground=luna.NAVY).pack(anchor="w", pady=(0, 2))
+        ttk.Label(self.body, text=intro, wraplength=760, justify="left").pack(anchor="w", pady=(0, 8))
+        self.top = ttk.Frame(self.body)
+        self.top.pack(fill="x")
+        mid = ttk.Frame(self.body)
+        mid.pack(fill="x", pady=8)
+        self.anim = XPAnim(mid, dest)
+        self.anim.pack(anchor="w")
+        self.bar = XPBar(mid)
+        self.bar.pack(anchor="w", pady=(6, 0), fill="x")
+        self.status = ttk.Label(mid, text="", font=(app.ui_font, 12, "bold"))
+        self.status.pack(anchor="w", pady=4)
+        self.btns = ttk.Frame(self.body)
+        self.btns.pack(fill="x", pady=4)
+        self.log = make_log(self.body, height=8)
+        self.log.pack(fill="both", expand=True, pady=(6, 0))
+
+    def say(self, s):
+        log_line(self.log, "[%s] %s" % (time.strftime("%H:%M:%S"), s))
+
+    def begin(self, msg):
+        self.running = True
+        self.anim.start()
+        self.bar.start()
+        self.status.config(text=msg)
+
+    def finish(self, ok, msg):
+        self.running = False
+        self.anim.stop(ok)
+        self.bar.stop(ok)
+        self.status.config(text=msg)
+
+
+class WritebackPage(RunPage):
+    def __init__(self, app):
+        super().__init__(app, "excel", "เขียนผลกลับไฟล์ Excel", "เขียนผลการตรวจสอบที่บันทึกในโปรแกรมกลับลงไฟล์ต้นฉบับ แก้เฉพาะช่องผลตรวจ (มี/ไม่มี สถานภาพ สถานที่ อำเภอ จังหวัด เบอร์โทร) ส่วนอื่นไม่ถูกแตะ")
+        self.info = ttk.Label(self.top, text="", justify="left", wraplength=760)
+        self.info.pack(anchor="w")
+        self.bk = tk.BooleanVar(value=bool(app.st.get("backup", True)))
+        ttk.Checkbutton(self.top, text="สำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน (แนะนำ)", variable=self.bk, command=self.set_backup).pack(anchor="w", pady=4)
+        self.go_btn = ttk.Button(self.btns, text="▶  เริ่มเขียนผลกลับ", style="Accent.TButton", command=self.start)
+        self.go_btn.pack(side="left")
+        self.refresh()
+
+    def set_backup(self):
+        self.app.st["backup"] = bool(self.bk.get())
+        core.save_settings(self.app.st)
+
+    def refresh(self):
+        db = self.db
+        if not db.persons:
+            self.info.config(text="ยังไม่มีข้อมูล — นำเข้าข้อมูลจากเมนู 1 ก่อน")
+            self.status.config(text="ไม่มีข้อมูลให้เขียน")
+            return
+        n = db.dirty_count()
+        p = db.source.get("path", "")
+        self.info.config(text="ไฟล์ต้นฉบับ: %s\nชีต: %s     รูปแบบ: %s\nผลที่ยังไม่เขียนกลับ: %d คน" % (
+            p, db.source.get("sheet", ""), "xlsb (เขียนผ่าน Microsoft Excel)" if core.is_xlsb(p) else "xlsx/xlsm (เขียนตรงลงไฟล์)", n))
+        self.status.config(text=("พร้อมเขียนผลของ %d คน" % n) if n else "ไม่มีผลที่เปลี่ยนจากไฟล์ต้นฉบับ")
+
+    def start(self):
+        db = self.db
+        if self.running:
+            return
+        if not db.persons:
+            return self.say("ยังไม่มีข้อมูล นำเข้าข้อมูลจากเมนู 1 ก่อน")
+        n = db.dirty_count()
+        if not n:
+            return self.say("ไม่มีผลที่เปลี่ยนจากไฟล์ต้นฉบับ ไม่ต้องเขียนกลับ")
+        extra = "\nต้องปิดไฟล์นี้ใน Excel ก่อน (ไฟล์ .xlsb เขียนผ่าน Microsoft Excel)" if core.is_xlsb(db.source.get("path", "")) else ""
+        if not messagebox.askyesno("เขียนผลกลับไฟล์ต้นฉบับ", "จะเขียนผลของ %d คน ลงไฟล์:\n%s\nชีต: %s\n%s%s" % (
+                n, db.source.get("path"), db.source.get("sheet"),
+                "ระบบจะสำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน" if self.bk.get() else "⚠ ปิดการสำรองไฟล์ไว้", extra)):
+            return
+        self.run(False)
+
+    def run(self, export):
+        db = self.db
+        self.begin("กำลังเขียนผลกลับ…")
+        self.go_btn.state(["disabled"])
+        self.say("ตรวจสอบไฟล์ต้นฉบับ: %s" % db.source.get("path"))
+        if self.bk.get() and not export:
+            self.say("สำรองไฟล์เดิมก่อนเขียน…")
+        self.say("กำลังเขียน %d คน ลงชีต %s%s" % (db.dirty_count(), db.source.get("sheet"), " (รอ Excel สักครู่)" if core.is_xlsb(db.source.get("path", "")) else ""))
+        q = queue.Queue()
+        backup = bool(self.bk.get())                   # อ่านค่า Tk ก่อนเข้าเธรด (เธรดห้ามแตะวิดเจ็ต)
+
+        def work():
+            try:
+                q.put(("ok",) + tuple(core.write_back(db, backup, xlsb_export=export)))
+            except core.ExcelError as e:
+                q.put(("xl", e))
+            except Exception as e:
+                q.put(("err", e))
+        threading.Thread(target=work, daemon=True).start()
+        self.after(200, self.poll, q, export)
+
+    def poll(self, q, export):
+        try:
+            r = q.get_nowait()
+        except queue.Empty:
+            return self.after(200, self.poll, q, export)
+        self.go_btn.state(["!disabled"])
+        if r[0] == "ok":
+            cells, bak = r[1], r[2]
+            if cells == -1:
+                self.say("สำเร็จ: สร้างไฟล์ใหม่ข้างไฟล์เดิม: %s (ไฟล์ .xlsb เดิมไม่ถูกแก้)" % bak)
+            else:
+                self.say("สำเร็จ: เขียน %d เซลล์เรียบร้อย" % cells)
+                if bak:
+                    self.say("ไฟล์สำรองอยู่ที่: %s" % bak)
+            self.refresh()
+            self.finish(True, "เสร็จแล้ว ✔")
+            return
+        e = r[1]
+        if r[0] == "xl" and e.code == "NOEXCEL" and not export:
+            self.finish(False, "ไม่พบ Microsoft Excel")
+            self.say("ไม่พบ Microsoft Excel ในเครื่อง")
+            if messagebox.askyesno("ไม่พบ Excel", "%s\nสร้างไฟล์ .xlsx ใหม่ข้างไฟล์เดิมแทน (ค่าล้วน ไม่มีรูปแบบ/มาโคร) ไหม?" % e):
+                return self.run(True)
+            return
+        self.finish(False, "ไม่สำเร็จ")
+        self.say("ผิดพลาด: %s" % e)
+        self.say("ไม่มีไฟล์ต้นฉบับถูกแก้ ลองใหม่ได้ (ถ้าไฟล์เปิดค้างใน Excel ให้ปิดก่อน)")
+
+
+class ClearPage(RunPage):
+    ACTIONS = (
+        ("results", "ล้างผลการตรวจสอบ", "ลบผลตรวจ (มี/ไม่มี สถานภาพ ที่อยู่ เบอร์โทร) ของทุกคนในโปรแกรม ไฟล์ Excel เดิมไม่ถูกแก้จนกว่าจะกด “เขียนผลกลับ”", False),
+        ("printed", "ล้างสถานะ “พิมพ์แล้ว”", "ล้างเครื่องหมาย “พิมพ์แล้ว” ทุกแบบ (ใช้เมื่อกระดาษเสียหรืออยากพิมพ์ใหม่ทั้งชุด)", False),
+        ("all", "ล้างข้อมูลที่นำเข้าทั้งหมด", "ลบข้อมูลทุกคนในโปรแกรม (ผลตรวจ + สถานะพิมพ์) ไฟล์ Excel ต้นฉบับไม่ถูกลบ ผลที่ยังไม่เขียนกลับจะหายไป", True))
+
+    def __init__(self, app):
+        super().__init__(app, "trash", "ล้างข้อมูล", "เลือกสิ่งที่ต้องการล้าง ระบบจะถามยืนยันก่อนเสมอ")
+        self.cnt = ttk.Label(self.top, text="", font=(app.ui_font, 11, "bold"))
+        self.cnt.pack(anchor="w", pady=(0, 6))
+        self.btnw = {}
+        for key, title, desc, danger in self.ACTIONS:
+            row = tk.Frame(self.top, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+            row.pack(fill="x", pady=3)
+            tk.Frame(row, bg="#C0392B" if danger else luna.BLUE, width=6).pack(side="left", fill="y")
+            tx = tk.Frame(row, bg=CARD)
+            tx.pack(side="left", fill="x", expand=True, padx=10, pady=6)
+            tk.Label(tx, text=title, bg=CARD, fg=luna.NAVY, font=(app.ui_font, 12, "bold"), anchor="w").pack(fill="x")
+            tk.Label(tx, text=desc, bg=CARD, fg=MUTED, font=(app.ui_font, 10), anchor="w", justify="left", wraplength=560).pack(fill="x")
+            b = ttk.Button(row, text="ล้าง…", command=lambda k=key: self.ask(k))
+            b.pack(side="right", padx=10)
+            self.btnw[key] = b
+        self.refresh()
+
+    def refresh(self):
+        db = self.db
+        n = len(db.persons)
+        res = sum(1 for p in db.persons if db.filled(p))
+        pr = sum(1 for p in db.persons if p.get("printed"))
+        self.cnt.config(text="ข้อมูลในโปรแกรมตอนนี้: %d คน   |   บันทึกผลแล้ว %d   |   มีสถานะพิมพ์แล้ว %d" % (n, res, pr))
+        self.status.config(text="พร้อม" if n else "ไม่มีข้อมูลในโปรแกรม")
+
+    def ask(self, key):
+        db = self.db
+        if self.running:
+            return
+        if not db.persons:
+            return self.say("ไม่มีข้อมูลในโปรแกรม ไม่ต้องล้าง")
+        msgs = {"results": ("ล้างผลการตรวจสอบ", "ล้างผลการตรวจสอบของทุกคนในโปรแกรม?\n(ไฟล์ Excel เดิมยังไม่ถูกแก้จนกว่าจะกด “เขียนผลกลับ”)"),
+                "printed": ("ล้างสถานะพิมพ์แล้ว", "ล้างเครื่องหมาย “พิมพ์แล้ว” ทุกแบบ?"),
+                "all": ("ล้างข้อมูลที่นำเข้า", "ลบข้อมูลทั้งหมดในโปรแกรม (ผลตรวจ+สถานะพิมพ์)?\nไฟล์ Excel ต้นฉบับไม่ถูกลบ\n\nผลที่ยังไม่เขียนกลับจะหายไป — ต่อไหม?")}
+        t, m = msgs[key]
+        if not messagebox.askyesno(t, m):
+            return
+        self.begin("กำลังล้าง…")
+        for b in self.btnw.values():
+            b.state(["disabled"])
+        self.say("เริ่ม: %s" % t)
+        self.after(1500, self.do, key, t)
+
+    def do(self, key, t):
+        db = self.db
+        try:
+            {"results": db.clear_results, "printed": db.clear_printed, "all": db.clear_all}[key]()
+        except Exception as e:
+            self.finish(False, "ไม่สำเร็จ")
+            self.say("ผิดพลาด: %s" % e)
+        else:
+            self.refresh()
+            self.finish(True, "เสร็จแล้ว ✔")
+            self.say("สำเร็จ: %s เรียบร้อย" % t)
+        for b in self.btnw.values():
+            b.state(["!disabled"])
+
+
 # ====================================================================== หน้าแรก + หน้าต่างหลัก
 NAVY = BG = ACCENT = GREEN = CARD = MUTED = SIDE = SIDE_HOVER = SIDE_ACT = GREEN_BTN = GREEN_BTN_HOVER = BORDER = ""
 
@@ -1780,7 +2122,7 @@ class HomePage(Page):
             nxt = ("reg", "ขั้นตอนถัดไป: พิมพ์บัญชีตรวจสอบสภาพ")
         go = tk.Label(inner, text="▶  " + nxt[1], bg=GREEN_BTN, fg="white", font=(fam, 15, "bold"), anchor="w", padx=22, pady=14, cursor="hand2")
         go.pack(fill="x", pady=(0, 14))
-        go.bind("<Button-1>", lambda e: app.writeback() if nxt[0] == "writeback" else app.nav(nxt[0]))
+        go.bind("<Button-1>", lambda e: app.nav(nxt[0]))
         go.bind("<Enter>", lambda e: go.config(bg=luna.mix(GREEN_BTN, "#000000", 0.2)))
         go.bind("<Leave>", lambda e: go.config(bg=GREEN_BTN))
         row = tk.Frame(inner, bg=BG)
@@ -1993,17 +2335,9 @@ class App(tk.Tk):
         self.navbtn = {}
         for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("form", "2  แบบพิมพ์รายบุคคล / ซอง"),
                          ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
-                         ("sum", "6  บัญชีสรุปผลการตรวจสอบ")):
+                         ("sum", "6  บัญชีสรุปผลการตรวจสอบ"), ("writeback", "7  เขียนผลกลับไฟล์ Excel"), ("clear", "8  ล้างข้อมูล")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
         tk.Frame(self.side, bg=luna.SIDE_SEP, height=1).pack(fill="x", padx=18, pady=14)
-        self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
-        cl = self.side_btn("ล้างข้อมูล  ▾", None)
-        m = tk.Menu(self, tearoff=0)
-        m.add_command(label="ล้างผลการตรวจสอบ", command=self.clear_results)
-        m.add_command(label="ล้างสถานะ “พิมพ์แล้ว” (กระดาษเสีย/พิมพ์ใหม่)", command=self.clear_printed)
-        m.add_separator()
-        m.add_command(label="ล้างข้อมูลที่นำเข้าทั้งหมด", command=self.clear_all)
-        cl.bind("<Button-1>", lambda e: m.tk_popup(cl.winfo_rootx() + 20, cl.winfo_rooty() + 40))
         self.navbtn["settings"] = self.side_btn("ตั้งค่า", lambda: self.nav("settings"))
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
         ft = tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=luna.SIDE_TOP, fg=luna.SIDE_FOOT, font=(f, 10), pady=9)
@@ -2043,7 +2377,7 @@ class App(tk.Tk):
 
     TITLES = {"home": "หน้าแรก", "import": "1  นำเข้าข้อมูลจากไฟล์ Excel", "send": "3  ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
               "record": "4  บันทึกผลการตรวจสอบสภาพ", "reg": "5  จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "6  บัญชีสรุปผลการตรวจสอบ",
-              "form": "2  แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
+              "form": "2  แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "writeback": "7  เขียนผลกลับไฟล์ Excel", "clear": "8  ล้างข้อมูล", "settings": "ตั้งค่า", "update": "ตรวจสอบอัปเดต"}
 
     def nav(self, key):
         if key in ("send", "record", "reg", "sum", "form") and not self.db.persons:
@@ -2058,7 +2392,7 @@ class App(tk.Tk):
                 pass
         self.unbind("<Escape>")
         mk = {"home": lambda: HomePage(self), "import": lambda: ImportWin(self), "record": lambda: RecordWin(self),
-              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"), "form": lambda: PersonalWin(self),
+              "send": lambda: PrintWin(self, "send"), "reg": lambda: PrintWin(self, "reg"), "sum": lambda: PrintWin(self, "sum"), "form": lambda: PersonalWin(self), "writeback": lambda: WritebackPage(self), "clear": lambda: ClearPage(self),
               "settings": lambda: SettingsWin(self), "update": lambda: UpdateWin(self)}
         self.set_title(self.TITLES[key])
         self._navkey = key
@@ -2086,64 +2420,6 @@ class App(tk.Tk):
             self.nav("home")
 
     # ---- เขียนกลับ / ล้าง
-    def writeback(self):
-        if not self.db.persons:
-            return messagebox.showinfo("เขียนกลับ", "ยังไม่มีข้อมูล")
-        n = self.db.dirty_count()
-        if not n:
-            return messagebox.showinfo("เขียนกลับ", "ไม่มีผลที่เปลี่ยนจากไฟล์ต้นฉบับ")
-        if core.is_xlsb(self.db.source.get("path", "")):
-            if not messagebox.askyesno("เขียนผลกลับไฟล์ .xlsb", "จะเขียนผลของ %d คน ลงไฟล์ .xlsb เดิมผ่าน Microsoft Excel:\n%s\nชีต: %s\n\nแก้เฉพาะช่องผลตรวจ ส่วนอื่นไม่ถูกแตะ (บันทึกเป็น .xlsb เหมือนเดิม)\nต้องปิดไฟล์นี้ใน Excel ก่อน — ต่อไหม?\n%s" % (
-                    n, self.db.source.get("path"), self.db.source.get("sheet"),
-                    "ระบบจะสำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน" if self.st.get("backup", True) else "⚠ ปิดการสำรองไฟล์ไว้")):
-                return
-            self.config(cursor="watch")
-            self.update_idletasks()
-            try:
-                cells, bak = core.write_back(self.db, self.st.get("backup", True))
-            except core.ExcelError as e:
-                self.config(cursor="")
-                if e.code == "NOEXCEL" and messagebox.askyesno("ไม่พบ Excel", "%s\nสร้างไฟล์ .xlsx ใหม่ข้างไฟล์เดิมแทน (ค่าล้วน ไม่มีรูปแบบ/มาโคร) ไหม?" % e):
-                    try:
-                        cells, bak = core.write_back(self.db, xlsb_export=True)
-                    except Exception as e2:
-                        return err("ส่งออกไม่สำเร็จ: %s" % e2)
-                    self.refresh_status()
-                    return messagebox.showinfo("สำเร็จ", "สร้างไฟล์ใหม่แล้ว:\n%s\nไฟล์ .xlsb เดิมไม่ถูกแก้" % bak)
-                return err("เขียนกลับไม่สำเร็จ: %s" % e) if e.code != "NOEXCEL" else None
-            except Exception as e:
-                self.config(cursor="")
-                return err("เขียนกลับไม่สำเร็จ: %s" % e)
-            self.config(cursor="")
-            self.refresh_status()
-            return messagebox.showinfo("สำเร็จ", "เขียน %d เซลล์ลงไฟล์ .xlsb เดิมแล้ว%s" % (cells, ("\nสำรองไว้ที่: " + bak) if bak else ""))
-        if not messagebox.askyesno("เขียนผลกลับไฟล์ต้นฉบับ", "จะเขียนผลของ %d คน ลงไฟล์:\n%s\nชีต: %s\n\nแก้เฉพาะช่องผลตรวจ (มี/ไม่มี สถานภาพ สถานที่ อำเภอ จังหวัด เบอร์โทร) ส่วนอื่นไม่ถูกแตะ\n%s" % (
-                n, self.db.source.get("path"), self.db.source.get("sheet"),
-                "ระบบจะสำรองไฟล์เดิมไว้ข้างไฟล์ก่อนเขียน" if self.st.get("backup", True) else "⚠ ปิดการสำรองไฟล์ไว้")):
-            return
-        try:
-            cells, bak = core.write_back(self.db, self.st.get("backup", True))
-        except Exception as e:
-            return err("เขียนกลับไม่สำเร็จ: %s" % e)
-        self.refresh_status()
-        messagebox.showinfo("สำเร็จ", "เขียน %d เซลล์แล้ว%s" % (cells, ("\nสำรองไว้ที่: " + bak) if bak else ""))
-
-    def clear_results(self):
-        if self.db.persons and messagebox.askyesno("ล้างผลการตรวจสอบ", "ล้างผลการตรวจสอบของทุกคนในโปรแกรม?\n(ไฟล์ Excel เดิมยังไม่ถูกแก้จนกว่าจะกด “เขียนผลกลับ”)"):
-            self.db.clear_results()
-            self.refresh_status()
-
-    def clear_printed(self):
-        if self.db.persons and messagebox.askyesno("ล้างสถานะพิมพ์แล้ว", "ล้างเครื่องหมาย “พิมพ์แล้ว” ทุกแบบ?"):
-            self.db.clear_printed()
-            messagebox.showinfo("เสร็จ", "ล้างแล้ว")
-            self.refresh_status()
-
-    def clear_all(self):
-        if self.db.persons and messagebox.askyesno("ล้างข้อมูลที่นำเข้า", "ลบข้อมูลทั้งหมดในโปรแกรม (ผลตรวจ+สถานะพิมพ์)?\nไฟล์ Excel ต้นฉบับไม่ถูกลบ\n\nผลที่ยังไม่เขียนกลับจะหายไป — ต่อไหม?"):
-            self.db.clear_all()
-            self.refresh_status()
-
     def silent_check(self):
         url = self.st.get("update_url") or UPDATE_BASE
         if not url:
