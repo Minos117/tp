@@ -95,6 +95,26 @@ class PreviewWin(tk.Toplevel):
 
 
 # ====================================================================== ตั้งค่า
+class VScroll(ttk.Frame):
+    """กรอบเลื่อนขึ้นลงได้ (แถบเลื่อน + ล้อเมาส์) ใส่เนื้อหาใน .inner — กันปุ่ม/ช่องตกจอเมื่อหน้าต่างเตี้ย"""
+
+    def __init__(self, parent, bg=None):
+        super().__init__(parent)
+        self.cv = tk.Canvas(self, highlightthickness=0, **({"bg": bg} if bg else {}))
+        sb = ttk.Scrollbar(self, orient="vertical", command=self.cv.yview)
+        self.cv.configure(yscrollcommand=sb.set)
+        self.inner = ttk.Frame(self.cv)
+        self._win = self.cv.create_window((0, 0), window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", self._cfg)
+        sb.pack(side="right", fill="y")
+        self.cv.pack(side="left", fill="both", expand=True)
+        self.cv.bind("<Enter>", lambda e: self.cv.bind_all("<MouseWheel>", lambda ev: self.cv.yview_scroll(-1 * (ev.delta // 120), "units")))
+        self.cv.bind("<Leave>", lambda e: self.cv.unbind_all("<MouseWheel>"))
+
+    def _cfg(self, e):
+        self.cv.configure(scrollregion=self.cv.bbox("all"), width=self.inner.winfo_reqwidth())
+
+
 class SettingsWin(Page):
     SAMPLE_PX = 5.0     # พิกเซลต่อมม. ในช่องดูตัวอย่างผู้ลงนาม
 
@@ -126,14 +146,15 @@ class SettingsWin(Page):
         self.sig_path = tk.StringVar(value=st.get("sig_image", ""))
         self.sig_w = tk.DoubleVar(value=float(st.get("sig_w", 32)))
         self.dx, self.dy = float(st.get("sig_dx", 0)), float(st.get("sig_dy", 0))
-        left = ttk.Frame(f2)
-        left.pack(side="left", fill="y", padx=(0, 16))
+        lsc = VScroll(f2)
+        lsc.pack(side="left", fill="y", padx=(0, 16))
+        left = lsc.inner
         ttk.Label(left, text="ระดับผู้ลงนามที่แก้ไข").pack(anchor="w")
         cb = ttk.Combobox(left, textvariable=self.lv, values=core.LEVELS, state="readonly", width=14)
         cb.pack(anchor="w", pady=(2, 10))
         cb.bind("<<ComboboxSelected>>", lambda e: self.switch())
         ttk.Label(left, text="ข้อความ 1 บรรทัดต่อ 1 แถว ชิดซ้ายของกล่อง\nเคาะวรรคเพื่อเลื่อนเองได้ (เหมือนใน Excel)\nใช้ {ตำบล} แทนชื่อตำบลของกำนัน", justify="left").pack(anchor="w")
-        self.txt = tk.Text(left, width=40, height=8, font=(app.ui_font, 12))
+        self.txt = tk.Text(left, width=40, height=7, font=(app.ui_font, 12))
         self.txt.pack(anchor="w", pady=6)
         self.txt.bind("<KeyRelease>", lambda e: self.edited())
         ttk.Separator(left).pack(fill="x", pady=8)
