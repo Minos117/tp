@@ -271,7 +271,8 @@ class ImportWin(Page):
         top = ttk.Frame(self, padding=8)
         top.pack(fill="x")
         ttk.Label(top, text="ไฟล์:").grid(row=0, column=0, sticky="w")
-        ttk.Entry(top, textvariable=self.path, width=70).grid(row=0, column=1, padx=4)
+        ttk.Entry(top, textvariable=self.path, width=50).grid(row=0, column=1, padx=4, sticky="we")
+        top.columnconfigure(1, weight=1)
         ttk.Button(top, text="เลือกไฟล์…", command=self.pick).grid(row=0, column=2)
         ttk.Label(top, text="ชีต:").grid(row=1, column=0, sticky="w", pady=4)
         self.cb = ttk.Combobox(top, textvariable=self.sheet, state="readonly", width=40)
@@ -282,30 +283,54 @@ class ImportWin(Page):
         for lab, var in (("แถวหัวตาราง", self.hrow), ("เริ่มดึงแถวที่", self.srow), ("ถึงแถวที่", self.erow)):
             ttk.Label(r2, text=lab).pack(side="left", padx=(8, 2))
             Spin(r2, from_=1, to=100000, textvariable=var, width=7).pack(side="left")
-        ttk.Button(r2, text="อ่านหัวตารางใหม่", command=self.load_headers).pack(side="left", padx=10)
-        ttk.Button(r2, text="หาแถวสุดท้ายอัตโนมัติ", command=self.find_last).pack(side="left")
+        r3 = ttk.Frame(top)
+        r3.grid(row=3, column=0, columnspan=3, sticky="w", pady=2)
+        ttk.Button(r3, text="อ่านหัวตารางใหม่", command=self.load_headers).pack(side="left", padx=8)
+        ttk.Button(r3, text="หาแถวสุดท้ายอัตโนมัติ", command=self.find_last).pack(side="left")
+        b = ttk.Frame(self, padding=8)          # แถบปุ่มล่างสุด: pack ก่อนเสมอ จะไม่ถูกดันตกจอ
+        b.pack(side="bottom", fill="x")
         mid = ttk.LabelFrame(self, text="จับคู่คอลัมน์ (เลือกคอลัมน์ในไฟล์ที่ตรงกับข้อมูลแต่ละช่อง)", padding=6)
         mid.pack(fill="both", expand=True, padx=8)
-        cv = tk.Canvas(mid, height=250)
+        self.cv = cv = tk.Canvas(mid, height=190, highlightthickness=0)
         sb = ttk.Scrollbar(mid, orient="vertical", command=cv.yview)
         self.mf = ttk.Frame(cv)
         self.mf.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
-        cv.create_window((0, 0), window=self.mf, anchor="nw")
+        self._win = cv.create_window((0, 0), window=self.mf, anchor="nw")
         cv.configure(yscrollcommand=sb.set)
         cv.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        self.mvars, self.opts = {}, []
+        cv.bind("<Configure>", self._resize)
+        cv.bind("<Enter>", lambda e: cv.bind_all("<MouseWheel>", lambda ev: cv.yview_scroll(-1 * (ev.delta // 120), "units")))
+        cv.bind("<Leave>", lambda e: cv.unbind_all("<MouseWheel>"))
         bot = ttk.LabelFrame(self, text="ตัวอย่าง 5 แถวแรกที่จะนำเข้า", padding=6)
-        bot.pack(fill="x", padx=8, pady=6)
-        self.tv = ttk.Treeview(bot, height=5, show="headings")
+        bot.pack(side="bottom", fill="x", padx=8, pady=6)
+        self.tv = ttk.Treeview(bot, height=4, show="headings")
+        hs = ttk.Scrollbar(bot, orient="horizontal", command=self.tv.xview)
+        self.tv.configure(xscrollcommand=hs.set)
         self.tv.pack(fill="x")
-        b = ttk.Frame(self, padding=8)
-        b.pack(fill="x")
+        hs.pack(fill="x")
+        self.mvars, self.opts = {}, []
+        self.ncols = 2
         ttk.Button(b, text="รีเฟรชตัวอย่าง", command=self.preview).pack(side="left")
         ttk.Button(b, text="นำเข้า", style="Accent.TButton", command=self.do_import).pack(side="right")
         ttk.Button(b, text="ยกเลิก", command=self.destroy).pack(side="right", padx=6)
         self.msg = ttk.Label(b, text="")
         self.msg.pack(side="left", padx=10)
+
+    def _resize(self, e):
+        """ขยาย/ย่อหน้าต่างแล้วจัดช่องจับคู่ให้พอดีความกว้าง (2-4 คอลัมน์)"""
+        self.cv.itemconfigure(self._win, width=e.width)
+        n = max(1, min(4, e.width // 430))
+        if n != self.ncols and self.mvars:
+            self.ncols = n
+            self._grid()
+
+    def _grid(self):
+        n = self.ncols
+        for i, k in enumerate(self.mvars):
+            lab, cb = self.mrows[k]
+            lab.grid(row=i // n, column=(i % n) * 2, sticky="w", padx=4, pady=1)
+            cb.grid(row=i // n, column=(i % n) * 2 + 1, padx=4, pady=1)
 
     def pick(self):
         p = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm *.xlsb"), ("ทั้งหมด", "*.*")])
@@ -335,15 +360,16 @@ class ImportWin(Page):
         mp = core.auto_map(hdr)
         for w in self.mf.winfo_children():
             w.destroy()
-        self.mvars = {}
+        self.mvars, self.mrows = {}, {}
         for i, (k, (title, _l)) in enumerate(core.FIELDS.items()):
             star = " *" if k in core.REQUIRED else ""
-            ttk.Label(self.mf, text="%s%s" % (title, star), width=22).grid(row=i // 2, column=(i % 2) * 2, sticky="w", padx=4, pady=1)
+            lab = ttk.Label(self.mf, text="%s%s" % (title, star), width=22)
             v = tk.StringVar(value=self.opts[mp[k]] if k in mp else "(ไม่ดึง)")
             cb = ttk.Combobox(self.mf, textvariable=v, values=self.opts, state="readonly", width=30)
-            cb.grid(row=i // 2, column=(i % 2) * 2 + 1, padx=4, pady=1)
             cb.bind("<<ComboboxSelected>>", lambda e: self.preview())
             self.mvars[k] = v
+            self.mrows[k] = (lab, cb)
+        self._grid()
         self.srow.set(self.hrow.get() + 1)
         self.find_last()
 
@@ -1019,7 +1045,7 @@ class App(tk.Tk):
                 pass
         super().__init__()
         self.title("%s  %s" % (APP_NAME, APP_VER))
-        self.minsize(1000, 640)
+        self.minsize(760, 520)
         try:
             self.state("zoomed")
         except tk.TclError:
