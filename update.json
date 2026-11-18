@@ -1,10 +1,10 @@
 {
- "version": "1.0.20",
+ "version": "1.0.21",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.20",
+  "version": "1.0.21",
   "files": [
    {
     "path": "assets/garuda.png",
@@ -49,6 +49,12 @@
     "size": 39145
    },
    {
+    "path": "zaia/luna.py",
+    "url": "zaia/luna.py",
+    "sha256": "8b23573981566e5e9522a3b1384947792796c57d94ff698b300af095bf1de41f",
+    "size": 6957
+   },
+   {
     "path": "zaia/render.py",
     "url": "zaia/render.py",
     "sha256": "37a30ecedfc41306acef7dc6df8b96ad92ab3ca46de2dd3154972ef6e4f4fa19",
@@ -57,8 +63,8 @@
    {
     "path": "zaia/ui.py",
     "url": "zaia/ui.py",
-    "sha256": "3c01957abc3d725433553d5d3eeae4b139a4b58abca5646afaf8f56360163e27",
-    "size": 115177
+    "sha256": "f844fb6f37ee67f579ca18fcabcaa8ffe24b38c1ea185df6bf0525ef0bfcaa0f",
+    "size": 115463
    },
    {
     "path": "zaia/updater.py",
@@ -69,7 +75,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "eca155051781c58457fa6a2d69b8468628c42a41dce380b1e0ca94540752aaaf",
+    "sha256": "2ba0f002be7588c87d26a5e230d410a8018e34e38435377ca8e6fcd05e2bfab3",
     "size": 889
    },
    {

@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter import font as tkfont
 
-from . import core, layout, render, updater
+from . import core, layout, luna, render, updater
 from .version import APP_NAME, APP_VER, UPDATE_BASE
 
 GEO = {}
@@ -1502,36 +1502,70 @@ class UpdateWin(Page):
 
 
 # ====================================================================== หน้าแรก + หน้าต่างหลัก
-NAVY, BG, ACCENT, GREEN, CARD, MUTED = "#0A246A", "#ECE9D8", "#245EDC", "#2E8B2E", "#FFFFFF", "#6B6A5E"      # สี Windows XP (Luna): พื้นครีม + น้ำเงิน + เขียว
-SIDE, SIDE_HOVER, SIDE_ACT = "#245EDC", "#3F78E8", "#3C9A3C"        # แถบเมนูฟ้าเข้มแบบ XP Luna + ปุ่มเลือกสีเขียว "Start"
-BAR_L, BAR_R = (0, 84, 227), (61, 149, 255)                          # แถบหัวเรื่องไล่สีฟ้า
+NAVY, BG, ACCENT, GREEN, CARD, MUTED = luna.NAVY, luna.BG, luna.BLUE, luna.GREEN, luna.CARD, luna.MUTED      # สี Windows XP (Luna) รวมอยู่ที่ luna.py
+SIDE, SIDE_HOVER, SIDE_ACT = luna.SIDE, luna.SIDE_HOVER, luna.SIDE_ACT_BG
+GREEN_BTN, GREEN_BTN_HOVER = "#3C9A3C", "#4CB04C"
+BORDER = luna.LINE
 
 
 class TitleBar(tk.Canvas):
-    """แถบหัวเรื่องไล่สีแบบ XP (วาดเป็นเส้นแนวตั้งไล่เฉด) ใช้ .config(text=...) เหมือน Label"""
+    """แถบหัวเรื่องแบบ XP: ไล่สีแนวตั้งมันวาว + เงาตัวอักษร + เส้นส้มใต้แถบ  ใช้ .config(text=...) เหมือน Label"""
 
     def __init__(self, parent, font):
-        super().__init__(parent, height=62, highlightthickness=0, bd=0)
-        self.font, self.text, self.H = font, "", 62
+        super().__init__(parent, height=62, highlightthickness=0, bd=0, bg="#0A5BE8")
+        self.font, self.text, self.H, self.news, self._img = font, "", 62, "", None
         self.bind("<Configure>", lambda e: self.draw())
 
     def config(self, **kw):
         if "text" in kw:
             self.text = kw.pop("text")
-            self.draw()
+        if "news" in kw:
+            self.news = kw.pop("news")
         if kw:
             super().config(**kw)
+        self.draw()
 
     def draw(self):
         self.delete("all")
         w, h = max(1, self.winfo_width()), self.H
-        step = 4
-        for x in range(0, w, step):
-            t = x / w
-            c = tuple(int(BAR_L[i] + (BAR_R[i] - BAR_L[i]) * t) for i in range(3))
-            self.create_rectangle(x, 0, x + step, h, fill="#%02x%02x%02x" % c, outline="")
-        self.create_rectangle(0, h - 3, w, h, fill="#3C9A3C", outline="")          # เส้นเขียวใต้แถบ
-        self.create_text(18, h / 2 - 1, text=self.text, anchor="w", fill="white", font=(self.font[0], 16 if h < 50 else self.font[1], "bold"))
+        self._img = ImageTk_photo(luna.vgrad(w, h - 3, luna.TITLE_STOPS), self)
+        self.create_image(0, 0, image=self._img, anchor="nw")
+        self.create_rectangle(0, h - 3, w, h, fill="#FFB22E", outline="")          # เส้นส้มใต้แถบ (เหมือนหัวเมนู Start)
+        self.create_line(0, h - 3, w, h - 3, fill="#FFD98A")
+        fs = 16 if h < 50 else self.font[1]
+        fn = (self.font[0], fs, "bold")
+        self.create_text(19, h / 2 - 1, text=self.text, anchor="w", fill="#0A2A7A", font=fn)       # เงา
+        self.create_text(18, h / 2 - 2, text=self.text, anchor="w", fill="white", font=fn)
+        if self.news:
+            self.create_text(w - 18, h / 2 - 1, text=self.news, anchor="e", fill="#FFE680", font=(self.font[0], 11, "bold"))
+
+
+def ImageTk_photo(im, master):
+    from PIL import ImageTk
+    return ImageTk.PhotoImage(im, master=master)
+
+
+class SideHead(tk.Canvas):
+    """หัวแถบเมนูซ้าย ไล่สีน้ำเงินเข้ม→ฟ้า มีโลโก้ + ชื่อโปรแกรม (แบบหัวเมนู Start)"""
+
+    def __init__(self, parent, logo, font):
+        super().__init__(parent, highlightthickness=0, bd=0, height=96, bg=luna.SIDE_TOP)
+        self.logo, self.font, self.compact, self._img = logo, font, False, None
+        self.bind("<Configure>", lambda e: self.draw())
+
+    def draw(self):
+        self.delete("all")
+        w, h = max(1, self.winfo_width()), 62 if self.compact else 96
+        self.config(height=h)
+        self._img = ImageTk_photo(luna.vgrad(w, h, ((0, luna.SIDE_TOP), (0.85, luna.SIDE), (1, luna.SIDE))), self)
+        self.create_image(0, 0, image=self._img, anchor="nw")
+        x = 12 if self.compact else 18
+        if self.logo:
+            self.create_image(x, h / 2, image=self.logo, anchor="w")
+            x += 68
+        fs = 11 if self.compact else 13
+        self.create_text(x + 1, h / 2 + 1, text="ZAIA\nPrepare Personal", anchor="w", fill="#08246F", font=(self.font, fs, "bold"))
+        self.create_text(x, h / 2, text="ZAIA\nPrepare Personal", anchor="w", fill="white", font=(self.font, fs, "bold"))
 
 
 def asset(name):
@@ -1542,7 +1576,7 @@ class Card(tk.Frame):
     """การ์ดคลิกได้"""
 
     def __init__(self, parent, num, title, desc, cmd, color=ACCENT):
-        super().__init__(parent, bg=CARD, highlightthickness=2, highlightbackground="#ACA899", cursor="hand2")
+        super().__init__(parent, bg=CARD, highlightthickness=2, highlightbackground=BORDER, cursor="hand2")
         fam = parent.winfo_toplevel().ui_font
         self.badge = tk.Label(self, text=num, bg=color, fg="white", font=(fam, 18, "bold"), width=2)
         self.badge.pack(side="left", fill="y")
@@ -1553,7 +1587,7 @@ class Card(tk.Frame):
         for w in [self, box] + list(box.winfo_children()) + [self.badge]:
             w.bind("<Button-1>", lambda e: cmd())
             w.bind("<Enter>", lambda e: self.config(highlightbackground=color))
-            w.bind("<Leave>", lambda e: self.config(highlightbackground="#ACA899"))
+            w.bind("<Leave>", lambda e: self.config(highlightbackground=BORDER))
 
 
 class HomePage(Page):
@@ -1583,19 +1617,19 @@ class HomePage(Page):
             nxt = ("writeback", "ขั้นตอนถัดไป: เขียนผลกลับไฟล์ Excel (%d คน)" % db.dirty_count())
         else:
             nxt = ("reg", "ขั้นตอนถัดไป: พิมพ์บัญชีตรวจสอบสภาพ")
-        go = tk.Label(inner, text="▶  " + nxt[1], bg=SIDE_ACT, fg="white", font=(fam, 15, "bold"), anchor="w", padx=22, pady=14, cursor="hand2")
+        go = tk.Label(inner, text="▶  " + nxt[1], bg=GREEN_BTN, fg="white", font=(fam, 15, "bold"), anchor="w", padx=22, pady=14, cursor="hand2")
         go.pack(fill="x", pady=(0, 14))
         go.bind("<Button-1>", lambda e: app.writeback() if nxt[0] == "writeback" else app.nav(nxt[0]))
         go.bind("<Enter>", lambda e: go.config(bg="#2F7F2F"))
-        go.bind("<Leave>", lambda e: go.config(bg=SIDE_ACT))
+        go.bind("<Leave>", lambda e: go.config(bg=GREEN_BTN))
         row = tk.Frame(inner, bg=BG)
         row.pack(fill="x")
         stats = [("รายชื่อทั้งหมด", str(n), "คน", NAVY), ("บันทึกผลแล้ว", str(done), "จาก %d คน" % n, GREEN),
-                 ("รอเขียนกลับ Excel", str(db.dirty_count()), "คน", "#D98A00"), ("พิมพ์บัญชีตรวจสอบแล้ว", str(printed), "คน", ACCENT)]
+                 ("รอเขียนกลับ Excel", str(db.dirty_count()), "คน", luna.ORANGE), ("พิมพ์บัญชีตรวจสอบแล้ว", str(printed), "คน", ACCENT)]
         cards = []
         for i, (t, v, u, c) in enumerate(stats):
             row.columnconfigure(i, weight=1, uniform="s")
-            f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground="#ACA899")
+            f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
             cards.append(f)
             tk.Frame(f, bg=c, height=5).pack(fill="x")
             tk.Label(f, text=t, bg=CARD, fg=MUTED, font=(fam, 11)).pack(anchor="w", padx=16, pady=(12, 0))
@@ -1730,15 +1764,12 @@ class App(tk.Tk):
         main.pack(side="left", fill="both", expand=True)
         self.h1 = TitleBar(main, (self.ui_font, 20, "bold"))
         self.h1.pack(fill="x")
-        self.news = tk.Label(self.h1, text="", bg="#%02x%02x%02x" % BAR_R, fg="#FFE680", font=(self.ui_font, 11, "bold"))
-        self.news.place(relx=1.0, x=-18, rely=0.5, anchor="e")
         self.content = tk.Frame(main, bg=BG)
         self.content.pack(fill="both", expand=True, padx=24, pady=(16, 16))
         self._sidebtns, self._compact = [], None
         self.build_side()
         self.bind("<Configure>", self._on_resize)
         self.cur = None
-        self.navbtn = {}
         self.nav("home")
         self.bind_all("<F1>", lambda e: self.nav("home"))
         self.after(1500, self.silent_check)
@@ -1758,38 +1789,26 @@ class App(tk.Tk):
         st.configure("TLabelframe.Label", background=BG, foreground=NAVY, font=(f, 11, "bold"))
         for w in ("TCheckbutton", "TRadiobutton"):
             st.configure(w, background=BG, font=(f, 11))
-        st.configure("TButton", padding=(14, 8), font=(f, 11), background="#F4F2E6", foreground="#000000", bordercolor="#003C74",
-                     lightcolor="#FFFFFF", darkcolor="#CFCBB8", relief="raised")
-        st.map("TButton", background=[("active", "#FFF3C4"), ("pressed", "#E3DFC9")], bordercolor=[("active", "#E5A100")])
-        st.configure("Accent.TButton", padding=(16, 9), font=(f, 11, "bold"), background="#3C9A3C", foreground="white", bordercolor="#1E5E1E",
-                     lightcolor="#7FD07F", darkcolor="#2A7A2A", relief="raised")
-        st.map("Accent.TButton", background=[("active", "#4CB04C"), ("pressed", "#2A7A2A")])
         st.configure("TEntry", padding=6, fieldbackground="white")
         st.configure("TCombobox", padding=6, fieldbackground="white")
         st.configure("TSpinbox", padding=5, fieldbackground="white")
         st.configure("Treeview", rowheight=28, font=(f, 11), fieldbackground="white")
-        st.configure("Treeview.Heading", font=(f, 11, "bold"), padding=6, background="#E4E0CC", bordercolor="#ACA899")
-        st.map("Treeview", background=[("selected", "#316AC5")], foreground=[("selected", "white")])
-        st.configure("TNotebook", background=BG, bordercolor="#919B9C")
-        st.configure("TNotebook.Tab", padding=(16, 8), font=(f, 11), background="#E4E0CC")
-        st.map("TNotebook.Tab", background=[("selected", "#FFFFFF")])
-        st.configure("Green.Horizontal.TProgressbar", troughcolor="#D6D2C2", background=GREEN, thickness=10)
+        st.configure("Treeview.Heading", font=(f, 11, "bold"), padding=6)
+        st.configure("TNotebook.Tab", padding=(16, 8), font=(f, 11))
+        self._luna = luna.install(st, self)           # ปุ่มเงา/สี/แท็บ/แถบเลื่อน แบบ Luna (เก็บภาพไว้กันถูกลบ)
+        st.configure("TButton", font=(f, 11))
+        st.configure("Accent.TButton", font=(f, 11, "bold"))
 
     def build_side(self):
         f = self.ui_font
-        head = tk.Frame(self.side, bg=SIDE)
-        head.pack(fill="x", pady=(22, 18), padx=18)
-        if self._logo_big:
-            tk.Label(head, image=self._logo_big, bg=SIDE).pack(side="left")
-        self._headtxt = tk.Label(head, text="ZAIA\nPrepare Personal", bg=SIDE, fg="white", font=(f, 13, "bold"), justify="left")
-        self._headtxt.pack(side="left", padx=10)
-        self._head = head
+        self._head = SideHead(self.side, self._logo_big, f)
+        self._head.pack(fill="x", pady=(0, 10))
         self.navbtn = {}
         for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("form", "2  แบบพิมพ์รายบุคคล / ซอง"),
                          ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
                          ("sum", "6  บัญชีสรุปผลการตรวจสอบ")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
-        tk.Frame(self.side, bg="#8FB0F0", height=1).pack(fill="x", padx=18, pady=14)
+        tk.Frame(self.side, bg="#6F9AF0", height=1).pack(fill="x", padx=18, pady=14)
         self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
         cl = self.side_btn("ล้างข้อมูล  ▾", None)
         m = tk.Menu(self, tearoff=0)
@@ -1800,7 +1819,8 @@ class App(tk.Tk):
         cl.bind("<Button-1>", lambda e: m.tk_popup(cl.winfo_rootx() + 20, cl.winfo_rooty() + 40))
         self.navbtn["settings"] = self.side_btn("ตั้งค่า", lambda: self.nav("settings"))
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
-        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=SIDE, fg="#CFE0FF", font=(f, 10)).pack(side="bottom", pady=12)
+        ft = tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=luna.SIDE_TOP, fg="#D6E4FF", font=(f, 10), pady=9)
+        ft.pack(side="bottom", fill="x")
 
     def _on_resize(self, e):
         """จอเล็ก (เช่นแท็บเล็ต 10 นิ้ว ที่ขยาย 150%): ย่อแถบเมนูซ้ายและช่องไฟ ให้เนื้อหามีที่มากขึ้น"""
@@ -1813,8 +1833,8 @@ class App(tk.Tk):
         self.side.config(width=224 if c else 270)
         for b in self._sidebtns:
             b.config(font=(self.ui_font, 11 if c else 12), padx=14 if c else 22, pady=4 if c else 11)
-        self._headtxt.config(font=(self.ui_font, 11 if c else 13, "bold"))
-        self._head.pack_configure(pady=(8, 6) if c else (22, 18), padx=10 if c else 18)
+        self._head.compact = c
+        self._head.draw()
         self.h1.config(height=46 if c else 62)
         self.h1.H = 46 if c else 62
         self.h1.draw()
@@ -1857,7 +1877,7 @@ class App(tk.Tk):
         self.cur = mk[key]()
         self.cur.pack(fill="both", expand=True)
         for k, b in self.navbtn.items():
-            b.config(bg=SIDE_ACT if k == key else SIDE, fg="white" if k == key else "#EAF1FF")
+            b.config(bg=SIDE_ACT if k == key else SIDE, fg=luna.SIDE_ACT_FG if k == key else "#F2F6FF")
 
     def go_home(self):
         self.nav("home")
@@ -1956,7 +1976,7 @@ class App(tk.Tk):
 
     def _poll_news(self, n):
         if self._nv:
-            self.news.config(text="● มีรุ่นใหม่ %s — เมนู ตรวจสอบอัปเดต" % self._nv)
+            self.h1.config(news="● มีรุ่นใหม่ %s — เมนู ตรวจสอบอัปเดต" % self._nv)
         elif n < 15:
             self.after(1000, self._poll_news, n + 1)
 
