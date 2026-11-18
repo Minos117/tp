@@ -4,26 +4,28 @@ from PIL import Image, ImageDraw, ImageTk
 
 # (รหัส, ชื่อ, สีหลัก(แถบซ้าย/หัวเรื่อง), สีปุ่มหลัก, สีเส้นใต้หัวเรื่อง)
 THEMES = (
-    ("luna", "XP ฟ้า (Luna)", "#2B63D9", "#3C9A3C", "#FFB22E"),
-    ("silver", "XP เงิน (Silver)", "#6F7A9C", "#46558C", "#CDD3E4"),
-    ("olive", "XP มะกอก (Olive)", "#6A8A3A", "#8C6A2F", "#E8C766"),
-    ("navy", "กรมท่า-ทอง", "#1F3A73", "#C08A1E", "#E6B84D"),
-    ("ocean", "ทะเลสีฟ้า", "#0E7FA8", "#D8672B", "#FFC857"),
-    ("forest", "ป่าเขียว", "#2F6B45", "#A9741F", "#D9B65D"),
-    ("emerald", "มรกต", "#0F8A6C", "#0B6B54", "#9FE3CD"),
-    ("sage", "เขียวเสจ", "#6F8F72", "#4C6B50", "#D3DEC6"),
-    ("rose", "กุหลาบ", "#C2547A", "#9A3560", "#F4B6C8"),
-    ("berry", "ราสป์เบอร์รี", "#A8264F", "#7A1F3D", "#F2A65A"),
-    ("purple", "ม่วงราชวงศ์", "#5B3E96", "#C98F10", "#F0C75E"),
-    ("lavender", "ลาเวนเดอร์", "#8A7CC9", "#5E4FA8", "#DDD6F5"),
-    ("crimson", "แดงเข้ม", "#A32424", "#7A1616", "#E8A33D"),
-    ("sunset", "ส้มพระอาทิตย์", "#D9622B", "#A3410F", "#FFD27A"),
-    ("amber", "ทองอำพัน", "#B8861B", "#7A5A0F", "#F5DC8A"),
-    ("choco", "ช็อกโกแลต", "#6B4A3A", "#B5651D", "#E0C097"),
-    ("slate", "เทาหินชนวน", "#4F5D75", "#2F6BB3", "#B8C4D9"),
-    ("charcoal", "ถ่านดำ", "#33383F", "#3A7BD5", "#9AA5B5"),
-    ("sky", "ฟ้าสดใส", "#4FA3E0", "#2677B8", "#CDE8F8"),
-    ("mint", "มิ้นต์", "#3DB39E", "#1F8A78", "#CBF0E4"),
+    ("luna", "XP ฟ้า (Luna) — ดั้งเดิม", "#2B63D9", "#3C9A3C", "#FFB22E"),
+    # ชุดสีกันดั้ม: แถบซ้าย/หัวเรื่อง = สีเกราะหลัก(ที่เข้มพอ)  ปุ่มหลัก = สีตัด  เส้นใต้หัวเรื่อง = สีรอง/โลหะ
+    ("rx78", "RX-78-2 Gundam", "#2A4D9B", "#C8262B", "#F2C230"),
+    ("zeta", "Zeta Gundam", "#33468A", "#B5342F", "#EFD04B"),
+    ("zz", "ZZ Gundam", "#2F55A4", "#D49B00", "#E2373A"),
+    ("nu", "Nu Gundam", "#26325E", "#C62F34", "#C9CED8"),
+    ("unicorn", "Unicorn Gundam", "#9B2226", "#C9A227", "#F3F3F3"),
+    ("banshee", "Banshee", "#262A33", "#B8912F", "#C23A3A"),
+    ("wingzero", "Wing Zero EW", "#3A62AE", "#C7A12B", "#D9363E"),
+    ("epyon", "Gundam Epyon", "#A82545", "#B8912A", "#2E9B52"),
+    ("tallgeese1", "Tallgeese I", "#566A93", "#B8912A", "#D0D5DE"),
+    ("tallgeese2", "Tallgeese II", "#6C7C99", "#2F3E5C", "#E3E6EC"),
+    ("tallgeese3", "Tallgeese III", "#2E4F57", "#A53A3A", "#C9A227"),
+    ("barbatos", "Barbatos", "#43557F", "#C23B2E", "#E6C34A"),
+    ("lupusrex", "Barbatos Lupus Rex", "#3C4A63", "#C9A227", "#A9B4C6"),
+    ("exia", "Gundam Exia", "#2E5C9E", "#D14B2E", "#F0F0F0"),
+    ("raiser", "00 Raiser", "#2B6FB0", "#E0792B", "#D93A2E"),
+    ("qant", "Gundam Qan[T]", "#2C86A8", "#1F5E7A", "#C9A227"),
+    ("freedom", "Freedom Gundam", "#2D5AA8", "#D99A12", "#C8322F"),
+    ("strikefree", "Strike Freedom", "#27408B", "#CFA93A", "#E9EDF5"),
+    ("aerial", "Gundam Aerial", "#35569C", "#D23A3A", "#4FB06A"),
+    ("mighty", "Mighty Strike Freedom", "#8F7424", "#B3262E", "#F2E8C4"),
 )
 DEFAULT = "luna"
 KEYS = ("BG", "CARD", "LINE", "LINE_D", "NAVY", "BLUE", "BLUE_SEL", "GREEN", "ORANGE", "MUTED", "HEAD_L", "TROUGH", "ROW_ALT", "SIDE", "SIDE_TOP",
@@ -161,7 +163,8 @@ def install(st, root):
         st.layout(sty, [(el, {"sticky": "nswe", "children": [("Button.padding", {"sticky": "nswe", "children": [("Button.label", {"sticky": "nswe"})]})]})])
     st.configure("TButton", foreground=NAVY, padding=(14, 7))
     st.map("TButton", foreground=[("disabled", "#8A94A8")])
-    st.configure("Accent.TButton", foreground="white", padding=(16, 8))
+    r, g_, b_ = _rgb(BTN)
+    st.configure("Accent.TButton", foreground="#1B1B1B" if 0.3 * r + 0.59 * g_ + 0.11 * b_ > 150 else "white", padding=(16, 8))
     st.map("Accent.TButton", foreground=[("disabled", "#8A94A8")])
 
     st.configure(".", background=BG)

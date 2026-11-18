@@ -1,10 +1,10 @@
 {
- "version": "1.0.22",
+ "version": "1.0.23",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.22",
+  "version": "1.0.23",
   "files": [
    {
     "path": "assets/garuda.png",
@@ -51,8 +51,8 @@
    {
     "path": "zaia/luna.py",
     "url": "zaia/luna.py",
-    "sha256": "9f784c098f3d51e846cb69ded77f4a00edf7dc84a0b64086fee81cdd65421c55",
-    "size": 11424
+    "sha256": "601d0dcbc885f0c47f84476f722b5ce3b90357b000dae188a03b872ac3063a6f",
+    "size": 11656
    },
    {
     "path": "zaia/render.py",
@@ -75,7 +75,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "261dbd86d7f4817a47bfcddd58fc0cb49f8a5ccbd8169031a202dfbf36a8f05d",
+    "sha256": "3f0ac07df4b7ded8de5b6699d8fd9d5fc5b9c23b13f49d9b2036056b59a1d19e",
     "size": 889
    },
    {
