@@ -16,7 +16,7 @@ FORMS = {
     "sum": dict(title="บัญชีสรุปผลการตรวจสอบ", paper=9, landscape=True, w=297, h=210, ml=10, mr=10, mt=8, mb=8),
     "send": dict(title="แบบส่งผู้ใหญ่บ้าน", paper=9, landscape=True, w=297, h=210, ml=10, mr=10, mt=8, mb=8),
     "form": dict(title="แบบพิมพ์รายบุคคล", paper=9, landscape=False, w=210, h=297, ml=6.35, mr=6.35, mt=10, mb=8),
-    "env": dict(title="จ่าหน้าซอง", paper=27, landscape=True, w=220, h=110, ml=0, mr=0, mt=0, mb=0),     # 27 = ซอง DL 110x220
+    "env": dict(title="จ่าหน้าซอง (ด้านหลัง A4 พับสาม)", paper=9, landscape=False, w=210, h=297, ml=0, mr=0, mt=0, mb=0),
 }
 
 
@@ -366,7 +366,8 @@ def build_form(ctx):
     for w in cw:
         xs.append(xs[-1] + w)
     Lh = 23.25 * PT * s
-    PTS = 16                                    # TH SarabunIT๙ 16 pt ทั้งฟอร์ม
+    PTS = 18                                    # TH SarabunIT๙ 18 pt (หัวข้อ/ข้อมูล) ป้ายช่องที่อยู่ 16 pt ตามเทมเพลต
+    NAVY, RED = (0, 32, 96), (255, 0, 0)
     year = st.get("year", "2570")
     pages = []
     for n, p in enumerate(ctx.persons, 1):
@@ -376,13 +377,13 @@ def build_form(ctx):
         def Y(r):                               # แถว 1 (ลำดับที่) ตัดออกแล้ว -> เริ่มที่แถว 2
             return top + (r - 2) * Lh
 
-        def lab(c1, c2, r, text, al="l", bold=True, u=False):
-            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, PTS, "u" if (u and bold) else bold, "f")
+        def lab(c1, c2, r, text="", al="l", bold=True, u=False, color=None, pt=None):
+            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, pt or PTS, "u" if (u and bold) else bold, "f%s" % (pt or ""), color)
 
         def val(c1, c2, r, text="", al="c", bold=False, line=True):
             if line:
                 _ln(pg, xs[c1], Y(r) + Lh, xs[c2 + 1], Y(r) + Lh, 0.2, True)
-            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, PTS, bold, "v")
+            _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, PTS, bold, None, NAVY)
 
         def box(c, r, text, dx=0.0):            # ช่องสี่เหลี่ยมให้ติ๊ก + ข้อความ
             sz = 4.3
@@ -411,26 +412,27 @@ def build_form(ctx):
         lab(1, 14, 11, "3  สถานภาพปัจจุบัน ทำเครื่องหมาย / และระบุสถานที่ปัจจุบัน (ให้ระบุ 1 ข้อ)")
 
         def addr(r):
-            lab(5, 5, r, "อำเภอ", "l"); val(6, 8, r)
-            lab(9, 9, r, "จังหวัด", "l"); val(10, 12, r)
-            lab(13, 13, r, "รหัสไปรษณีย์", "c"); val(14, 14, r)
+            lab(5, 5, r, "อำเภอ", "l", pt=16); val(6, 8, r)
+            lab(9, 9, r, "จังหวัด", "l", pt=16); val(10, 12, r)
+            lab(13, 13, r, "รหัสไปรษณีย์", "c", pt=16); val(14, 14, r)
 
         box(1, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
-        lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False); addr(13)
+        lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False, pt=16); addr(13)
         box(1, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
         lab(9, 9, 14, "คณะ", "c"); val(10, 12, 14); lab(12, 13, 14, "ชั้นปีที่", "r"); val(14, 14, 14)
         addr(15)
         box(1, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
         addr(17)
         box(1, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
-        lab(0, 3, 19, "     - เช่น ตาย", "l", False); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
+        lab(0, 3, 19, "     - เช่น ตาย", "l", False, pt=16); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
         lab(1, 14, 20, "4  เบอร์โทรศัพท์ที่สามารถติดต่อได้ (กรณีกองทัพบกเรียกพลฯ เพื่อฝึกหรือเพื่อตรวจสอบ)")
         for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
-            lab(1, 6, r, tx, "r"); val(7, 12, r); lab(13, 13, r, "โปรดระบุ", "l", False)
-        lab(1, 14, 24, "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ%s ภายในวันที่ %s" % (am, st.get("deadline", "")), "l", True, True)
+            lab(1, 6, r, tx, "r"); val(7, 12, r); lab(13, 13, r, "โปรดระบุ", "l", False, color=RED)
+        lab(1, 14, 24, "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ%s ภายในวันที่ %s" % (am, st.get("deadline", "")), "l", True, True, RED)
         lab(5, 13, 25, "ขอรับรองว่าได้ตรวจสอบข้อมูลจากทหารกองหนุนจริง", "l", False)
         lab(5, 5, 26, "(ลงชื่อ)"); val(6, 10, 26); lab(11, 14, 26, "ผู้ใหญ่บ้าน", "l", False)
-        lab(6, 14, 27, "(.....................................................)", "l", False)
+        lab(6, 6, 27, "(", "l", False); lab(10, 10, 27, ")", "r", False)       # วงเล็บซ้าย-ขวายาวเท่าเส้นลงชื่อ
+        _ln(pg, xs[6] + 3, Y(27) + Lh * 0.8, xs[11] - 3, Y(27) + Lh * 0.8, 0.2, True)
         lab(1, 14, 29, "หมายเหตุ  ตามพระราชบัญญัติรับราชการทหาร พ.ศ.2497  มาตรา 47  ทหารกองเกินและ")
         lab(2, 14, 30, "ทหารกองหนุนผู้ใด ไม่มาเข้ารับการเรียกพลเพื่อตรวจสอบ ตามมาตรา 36 ต้องระวางโทษ")
         lab(2, 14, 31, "ทั้งจำคุกและปรับ")
@@ -439,9 +441,11 @@ def build_form(ctx):
 
 
 def build_env(ctx):
+    """จ่าหน้าซอง พิมพ์ด้านหลัง A4 แนวตั้ง แล้วพับสาม: พื้นที่ซอง = 1 ใน 3 ของหน้า (กว้าง 210 x สูง 99 มม.) เลือกส่วนบน/กลาง/ล่างได้"""
     g, st = ctx.g, ctx.st
     from . import core
     pages = []
+    y0 = {"บน": 0.0, "กลาง": 99.0, "ล่าง": 198.0}.get(str(st.get("env_pos", "บน")).replace("ส่วน", ""), 0.0)
     ua = st.get("unit_amphoe") or st.get("amphoe", "") or st.get("_amphoe", "")
     up = st.get("unit_province") or st.get("province", "") or st.get("_province", "")
     uz = st.get("unit_zip") or core.zip_lookup(up, ua)
@@ -455,20 +459,20 @@ def build_env(ctx):
         gr = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "garuda.png")
     for p in ctx.persons:
         pg = Page(g["w"], g["h"])
-        sx = 10
-        if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน (ตามเทมเพลต) ข้อความผู้ส่งอยู่ถัดไปทางขวา
-            gh = 25.0                                            # สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
+        sx = 14
+        if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
+            gh = 25.0
             gw = gh * 253 / 199
-            pg.ops.append(("img", gr, 10, 8, gw, gh))
-            sx = 10 + gw + 3
+            pg.ops.append(("img", gr, 14, y0 + 10, gw, gh))
+            sx = 14 + gw + 3
         for i, tx in enumerate(snd):
-            _t(pg, sx, 8 + i * 6.4, 100, 6.4, tx, "l", 16, False, "s")
+            _t(pg, sx, y0 + 10 + i * 6.4, 110, 6.4, tx, "l", 16, False, "s")
         if st.get("env_no"):
-            _t(pg, 10, 40, 90, 7, "ที่  %s" % st["env_no"], "l", 16, False, "n")
+            _t(pg, 14, y0 + 42, 90, 7, "ที่  %s" % st["env_no"], "l", 16, False, "n")
         am, pv = _p(p, "amphoe") or st.get("amphoe", ""), _p(p, "province") or st.get("province", "")
         z = core.zip_lookup(pv, am, _p(p, "tambon"))
         name = ("%s %s  %s" % (_p(p, "rank"), _p(p, "name"), _p(p, "surname"))).replace("  ", " ").strip()
-        rx, ry, rh = 92, 54, 9.5                                  # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
+        rx, ry, rh = 88, y0 + 52, 9.5                             # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
         _t(pg, rx, ry, 16, rh, "เรียน", "l", 18, False, "e")
         rows = [name, "บ้านเลขที่ %s หมู่ที่ %s ตำบล%s" % (_p(p, "house"), _p(p, "moo"), _p(p, "tambon")),
                 "อำเภอ%s จังหวัด%s" % (am, pv), z]

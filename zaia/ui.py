@@ -155,9 +155,9 @@ class SettingsWin(Page):
             ttk.Label(f3, text=lab).grid(row=i, column=0, sticky="w", pady=5)
             self.v[k] = tk.StringVar(value=str(st.get(k, "")))
             ttk.Entry(f3, textvariable=self.v[k], width=46).grid(row=i, column=1, pady=5, padx=8, sticky="w")
-        self.env_rot = tk.BooleanVar(value=bool(st.get("env_rot", True)))
-        ttk.Checkbutton(f3, text="ซองป้อนแนวตั้ง (ตั้งไดรเวอร์เป็นแนวตั้ง และหมุนข้อความ 90° ให้อ่านตามด้านยาวซอง)", variable=self.env_rot).grid(
-            row=len(rows3) + 3, column=0, columnspan=2, sticky="w", pady=6)
+        self.env_pos = tk.StringVar(value=str(st.get("env_pos", "บน")).replace("ส่วน", ""))
+        ttk.Label(f3, text="จ่าหน้าซอง: พิมพ์ด้านหลัง A4 แล้วพับสาม — วางที่ส่วน").grid(row=len(rows3) + 3, column=0, sticky="w", pady=6)
+        ttk.Combobox(f3, textvariable=self.env_pos, values=["บน", "กลาง", "ล่าง"], state="readonly", width=10).grid(row=len(rows3) + 3, column=1, sticky="w", padx=8)
         self.zipmsg = ttk.Label(f3, text="")
         ttk.Button(f3, text="คิดรหัสไปรษณีย์จากอำเภอ/จังหวัดของหน่วย", command=self.guess_zip).grid(row=len(rows3) + 1, column=1, sticky="w", pady=6, padx=8)
         self.zipmsg.grid(row=len(rows3) + 2, column=1, sticky="w", padx=8)
@@ -302,7 +302,7 @@ class SettingsWin(Page):
         for lv, k in self.keys.items():
             st[k] = self.lines[lv]
         st["backup"] = self.backup.get()
-        st["env_rot"] = self.env_rot.get()
+        st["env_pos"] = self.env_pos.get()
         st["show_tambon_p2"] = self.tam_p2.get()
         st["sig_image"], st["sig_level"] = self.sig_path.get(), self.sig_level.get()
         st["sig_w"], st["sig_dx"], st["sig_dy"] = round(self.sig_w.get(), 1), round(self.dx, 2), round(self.dy, 2)
@@ -698,7 +698,7 @@ class RecordWin(Page):
 # ====================================================================== 2/4/5) พิมพ์
 class PrintWin(Page):
     TITLES = {"reg": "จัดพิมพ์บัญชีตรวจสอบสภาพ", "sum": "บัญชีสรุปผลการตรวจสอบ", "send": "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ",
-              "form": "แบบพิมพ์รายบุคคล", "env": "จ่าหน้าซองจดหมาย (DL)"}
+              "form": "แบบพิมพ์รายบุคคล", "env": "จ่าหน้าซอง (ด้านหลัง A4)"}
 
     def __init__(self, app, kind):
         super().__init__(app)
@@ -985,7 +985,7 @@ class PersonalWin(PrintWin):
         r2 = ttk.Frame(body)
         r2.pack(anchor="w")
         ttk.Checkbutton(r2, text="แบบพิมพ์รายบุคคล (A4 แนวตั้ง 1 หน้า/คน)", variable=self.do_form, command=self.upd).pack(anchor="w")
-        ttk.Checkbutton(r2, text="จ่าหน้าซอง (ซอง DL 1 ใบ/คน)", variable=self.do_env, command=self.upd).pack(anchor="w")
+        ttk.Checkbutton(r2, text="จ่าหน้าซอง (พิมพ์ด้านหลัง A4 ของแบบพิมพ์ แล้วพับสามส่งไปรษณีย์)", variable=self.do_env, command=self.upd).pack(anchor="w")
         o = ttk.Frame(body)
         o.pack(anchor="w", pady=(4, 0))
         ttk.Label(o, text="จำนวนฉบับ/ชุด").pack(side="left")
@@ -999,8 +999,7 @@ class PersonalWin(PrintWin):
         g2.pack(anchor="w")
         ttk.Label(g2, text="เครื่องพิมพ์ (แบบพิมพ์)").grid(row=0, column=0, sticky="w", pady=3)
         ttk.Combobox(g2, textvariable=self.printer, values=render.list_printers(), width=46).grid(row=0, column=1, padx=8)
-        ttk.Label(g2, text="เครื่องพิมพ์ (ซอง) ว่าง = เครื่องเดียวกัน").grid(row=1, column=0, sticky="w", pady=3)
-        ttk.Combobox(g2, textvariable=self.eprinter, values=[""] + render.list_printers(), width=46).grid(row=1, column=1, padx=8)
+        ttk.Label(g2, text="ถ้าติ๊กทั้งสองอย่าง โปรแกรมพิมพ์แบบพิมพ์ก่อน แล้วให้พลิกกระดาษใส่ใหม่เพื่อพิมพ์ซองด้านหลัง", foreground="#555").grid(row=1, column=0, columnspan=2, sticky="w", pady=3)
         bf = ttk.Frame(body)
         bf.pack(anchor="w", pady=10)
         ttk.Button(bf, text="ดูตัวอย่างแบบพิมพ์", command=lambda: self.preview("form")).pack(side="left", padx=3)
@@ -1079,16 +1078,22 @@ class PersonalWin(PrintWin):
 
     def worker2(self, jobs, test):
         st = dict(self.app.st)
+        n_done = 0
         try:
             for k, rows in jobs:
                 if self.cancel:
                     break
                 form = layout.FORMS[k]
-                rot = k == "env" and bool(st.get("env_rot", True))
-                pr = (self.eprinter.get() or self.printer.get()) if k == "env" else self.printer.get()
-                self.say("%s: %d ใบ/หน้า → %s%s" % (self.TITLES[k], len(rows), pr or "(เครื่องพิมพ์เริ่มต้น)", " [หมุน 90°]" if rot else ""))
+                pr = self.printer.get()
+                if k == "env" and n_done:
+                    ev = threading.Event()
+                    self.post(self._flip, ev)
+                    ev.wait()
+                    if self.cancel:
+                        break
+                self.say("%s: %d ใบ/หน้า → %s" % (self.TITLES[k], len(rows), pr or "(เครื่องพิมพ์เริ่มต้น)"))
                 pages = layout.build(k, rows, st, self.ptype.get(), "", "อำเภอ")
-                gp = render.GdiPrinter(pr, form["paper"], form["landscape"] and not rot, self.app.font_family(), self.copies.get(), rot)
+                gp = render.GdiPrinter(pr, form["paper"], form["landscape"], self.app.font_family(), self.copies.get())
                 try:
                     gp.print_doc(pages, "ZAIA %s" % k, lambda: self.cancel)
                 finally:
@@ -1099,6 +1104,7 @@ class PersonalWin(PrintWin):
                 if not test:
                     self.post(self.db.mark_printed, rows, k)
                 self.say("ส่งพิมพ์แล้ว %d หน้า" % len(pages))
+                n_done += 1
             self.say("เสร็จสิ้น" if not self.cancel else "หยุดแล้ว")
         except Exception as e:
             self.say("ผิดพลาด: %s" % e)
@@ -1106,6 +1112,11 @@ class PersonalWin(PrintWin):
         finally:
             self.busy = False
             self.post(self.upd)
+
+    def _flip(self, ev):
+        if not messagebox.askokcancel("พลิกกระดาษ", "แบบพิมพ์พิมพ์เสร็จแล้ว\nให้นำกระดาษชุดนั้นพลิกด้านใส่ถาดใหม่ (เรียงลำดับเดิม) แล้วกด OK เพื่อพิมพ์จ่าหน้าซองด้านหลัง"):
+            self.cancel = True
+        ev.set()
 
 
 # ====================================================================== อัปเดต
