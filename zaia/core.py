@@ -226,6 +226,22 @@ class DB:
         m = {p["moo"] for p in self.persons if p["moo"] and (not tambon or tambon == ALL_TAMBON or p["tambon"] == tambon)}
         return sorted(m, key=moo_key)
 
+    def _of_type(self, ptype):
+        return [p for p in self.persons if ptype in (ALL_TYPES, "", None) or guess_type(p) == ptype]
+
+    def types_present(self):
+        have = {guess_type(p) for p in self.persons}
+        return [t for t in TYPES if t in have]
+
+    def tambons_for(self, ptype=ALL_TYPES):
+        """เฉพาะตำบลที่มีคนในประเภทนั้น (เรียงตามลำดับที่พบ)"""
+        have = {p["tambon"] for p in self._of_type(ptype) if p["tambon"]}
+        return [t for t in self.tambons() if t in have]
+
+    def moos_for(self, ptype=ALL_TYPES, tambon=None):
+        m = {p["moo"] for p in self._of_type(ptype) if p["moo"] and (not tambon or tambon == ALL_TAMBON or p["tambon"] == tambon)}
+        return sorted(m, key=moo_key)
+
     def filled(self, p):
         return bool(p.get("result"))
 

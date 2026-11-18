@@ -721,7 +721,9 @@ class PrintWin(Page):
         self.printer = tk.StringVar(value=app.st.get("printer") or render.default_printer())
         r = 0
         ttk.Label(g, text="ประเภททหาร").grid(row=r, column=0, sticky="w", pady=3)
-        ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + core.TYPES, state="readonly", width=40).grid(row=r, column=1, sticky="w")
+        self.cptype = ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + self.db.types_present(), state="readonly", width=40)
+        self.cptype.grid(row=r, column=1, sticky="w")
+        self.cptype.bind("<<ComboboxSelected>>", lambda e: self.upd())
         if kind == "form":
             r += 1
             ttk.Label(g, text="ชนิดงานพิมพ์").grid(row=r, column=0, sticky="w", pady=3)
@@ -740,12 +742,12 @@ class PrintWin(Page):
             ttk.Label(g, text="ระดับอำเภอ (ข้อความ “ตรวจถูกต้อง”)").grid(row=r, column=1, sticky="w")
         r += 1
         ttk.Label(g, text="ตำบล").grid(row=r, column=0, sticky="w", pady=3)
-        self.ctam = ttk.Combobox(g, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons(), state="readonly", width=20)
+        self.ctam = ttk.Combobox(g, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons_for(), state="readonly", width=20)
         self.ctam.grid(row=r, column=1, sticky="w")
         self.ctam.bind("<<ComboboxSelected>>", lambda e: self.upd())
         r += 1
         ttk.Label(g, text="หมู่ที่").grid(row=r, column=0, sticky="w", pady=3)
-        self.cmoo = ttk.Combobox(g, textvariable=self.moo, values=["ทั้งหมด"] + self.db.moos(), state="readonly", width=20)
+        self.cmoo = ttk.Combobox(g, textvariable=self.moo, values=["ทั้งหมด"] + self.db.moos_for(), state="readonly", width=20)
         self.cmoo.grid(row=r, column=1, sticky="w")
         self.cmoo.bind("<<ComboboxSelected>>", lambda e: self.upd())
         r += 1
@@ -779,6 +781,16 @@ class PrintWin(Page):
         self.upd()
         self.pump()
 
+    def refresh_lists(self):
+        """รายการตำบล/หมู่ แสดงเฉพาะที่มีคนตามประเภทที่เลือก"""
+        pt = self.ptype.get()
+        self.ctam["values"] = [core.ALL_TAMBON] + self.db.tambons_for(pt)
+        if self.tam.get() not in self.ctam["values"]:
+            self.tam.set(core.ALL_TAMBON)
+        self.cmoo["values"] = ["ทั้งหมด"] + self.db.moos_for(pt, self.tam.get())
+        if self.moo.get() not in self.cmoo["values"]:
+            self.moo.set("ทั้งหมด")
+
     def set_sub(self):
         self.kind = "env" if self.sub.get().startswith("จ่าหน้า") else "form"
         self.upd()
@@ -805,10 +817,8 @@ class PrintWin(Page):
                               self.mark_key() if self.only.get() else None)
 
     def upd(self):
+        self.refresh_lists()
         t = self.tam.get()
-        self.cmoo["values"] = ["ทั้งหมด"] + self.db.moos(t)
-        if self.moo.get() not in self.cmoo["values"]:
-            self.moo.set("ทั้งหมด")
         rows = self.sel()
         done = sum(1 for p in self.db.select(self.ptype.get(), t, None if self.moo.get() == "ทั้งหมด" else self.moo.get()) if self.mark_key() in p.get("printed", {}))
         self.info.config(text="ตรงเงื่อนไข %d คน  |  (พิมพ์แล้ว %d คน ในช่วงที่เลือก)" % (len(rows), done))
@@ -968,13 +978,15 @@ class PersonalWin(PrintWin):
         g = ttk.Frame(body)
         g.pack(anchor="w")
         ttk.Label(g, text="ประเภททหาร").grid(row=0, column=0, sticky="w", pady=3)
-        ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + core.TYPES, state="readonly", width=36).grid(row=0, column=1, sticky="w", padx=8)
+        self.cptype = ttk.Combobox(g, textvariable=self.ptype, values=[core.ALL_TYPES] + self.db.types_present(), state="readonly", width=36)
+        self.cptype.grid(row=0, column=1, sticky="w", padx=8)
+        self.cptype.bind("<<ComboboxSelected>>", lambda e: self.upd())
         ttk.Label(g, text="ตำบล").grid(row=1, column=0, sticky="w", pady=3)
-        self.ctam = ttk.Combobox(g, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons(), state="readonly", width=20)
+        self.ctam = ttk.Combobox(g, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons_for(), state="readonly", width=20)
         self.ctam.grid(row=1, column=1, sticky="w", padx=8)
         self.ctam.bind("<<ComboboxSelected>>", lambda e: self.upd())
         ttk.Label(g, text="หมู่ที่").grid(row=2, column=0, sticky="w", pady=3)
-        self.cmoo = ttk.Combobox(g, textvariable=self.moo, values=["ทั้งหมด"] + self.db.moos(), state="readonly", width=20)
+        self.cmoo = ttk.Combobox(g, textvariable=self.moo, values=["ทั้งหมด"] + self.db.moos_for(), state="readonly", width=20)
         self.cmoo.grid(row=2, column=1, sticky="w", padx=8)
         self.cmoo.bind("<<ComboboxSelected>>", lambda e: self.upd())
         ttk.Checkbutton(g, text="เฉพาะคนที่ยังไม่เคยพิมพ์", variable=self.only, command=self.upd).grid(row=3, column=1, sticky="w", padx=8, pady=3)
@@ -1026,10 +1038,7 @@ class PersonalWin(PrintWin):
                               (key or self.mark_key()) if self.only.get() else None)
 
     def upd(self):
-        t = self.tam.get()
-        self.cmoo["values"] = ["ทั้งหมด"] + self.db.moos(t)
-        if self.moo.get() not in self.cmoo["values"]:
-            self.moo.set("ทั้งหมด")
+        self.refresh_lists()
         rows = self.sel()
         k = self.keys()
         self.info.config(text="จะพิมพ์ %d คน%s" % (len(rows), ("  →  %d หน้า/ใบ" % (len(rows) * len(k))) if k else "  (ยังไม่ได้เลือกสิ่งที่จะพิมพ์)"))

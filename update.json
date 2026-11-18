@@ -1,10 +1,10 @@
 {
- "version": "1.0.13",
+ "version": "1.0.14",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.13",
+  "version": "1.0.14",
   "files": [
    {
     "path": "assets/garuda.png",
@@ -33,8 +33,8 @@
    {
     "path": "zaia/core.py",
     "url": "zaia/core.py",
-    "sha256": "cb8f5164b159eb63e22827d24e8b86642fb683cb8bcea328afc12d6c2731702f",
-    "size": 27945
+    "sha256": "585f6cbf50c37ced6022f0b6fb19f48c7237f9cff538a87b2712fc871490d080",
+    "size": 28763
    },
    {
     "path": "zaia/geo_th.json",
@@ -57,8 +57,8 @@
    {
     "path": "zaia/ui.py",
     "url": "zaia/ui.py",
-    "sha256": "dd9c34ad45f3cb8188db1ab7a7676768ae4046471e466fc29b49e6a3d7ee840c",
-    "size": 95225
+    "sha256": "179edeb7577d335855c5c5df52c36c45dfcb1aa66dbc9d76002f3581fbef7065",
+    "size": 95739
    },
    {
     "path": "zaia/updater.py",
@@ -69,7 +69,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "359b9864c4752588ee2e237cc42953096a32e2cf9411d606d134cd8fd9cd7a9e",
+    "sha256": "c49f8b612dc3e34d733400cf5f4d9453d6f9abb4fb7a957befb121a6f6dea146",
     "size": 889
    },
    {
