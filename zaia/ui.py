@@ -484,6 +484,9 @@ class RecordWin(Page):
         self.prog.pack(anchor="w")
         right = ttk.Frame(self, padding=10)
         right.pack(side="left", fill="both", expand=True)
+        self.saved = tk.Label(right, text="", fg="#15803D", bg=BG, font=(app.ui_font, 13, "bold"), anchor="w", padx=8)
+        self.saved.pack(fill="x", pady=(0, 6))          # แถบข้อความ "บันทึกข้อมูลแล้ว" อยู่บนสุด มองเห็นเสมอ
+        self._saved_job = None
         self.head = ttk.Label(right, text="— เลือกรายชื่อทางซ้าย —", font=BIG)
         self.head.pack(anchor="w")
         self.sub = ttk.Label(right, text="", wraplength=700)
@@ -627,6 +630,7 @@ class RecordWin(Page):
         for k in ("tel", "tel_par", "tel_work"):
             p[k] = self.v[k].get().strip()
         self.db.save()
+        self.flash("✔ บันทึกข้อมูลแล้ว: %s %s %s" % (p.get("rank", ""), p["name"], p["surname"]))
         i = self.lb.curselection()[0] if self.lb.curselection() else -1
         self.refill()
         self.app.refresh_status()
@@ -638,6 +642,12 @@ class RecordWin(Page):
                 self.lb.selection_set(j)
                 self.lb.see(j)
                 self.load(self.view[j])
+
+    def flash(self, text, ms=4000):
+        self.saved.config(text=text, bg="#E7F6EC")
+        if self._saved_job:
+            self.after_cancel(self._saved_job)
+        self._saved_job = self.after(ms, lambda: self.saved.winfo_exists() and self.saved.config(text="", bg=BG))
 
     def clear_one(self):
         p = self.cur

@@ -1,10 +1,10 @@
 {
- "version": "1.0.7",
+ "version": "1.0.8",
  "setup_rev": 1,
  "notes": "1.0.0 - รายการไฟล์ (files) จะถูกสร้างโดย MakeRelease.py หลัง build_all.bat",
  "files": [],
  "patch": {
-  "version": "1.0.7",
+  "version": "1.0.8",
   "files": [
    {
     "path": "assets/logo.ico",
@@ -51,8 +51,8 @@
    {
     "path": "zaia/ui.py",
     "url": "zaia/ui.py",
-    "sha256": "859ad15db1553332f05af6b60c28e6df132b06361cfc59d9812b9eb2c4849437",
-    "size": 76057
+    "sha256": "e828fa8faa38e5b753c07dfbafb78c2494922ef005e201c6e88909d64ba20270",
+    "size": 76818
    },
    {
     "path": "zaia/updater.py",
@@ -63,7 +63,7 @@
    {
     "path": "zaia/version.py",
     "url": "zaia/version.py",
-    "sha256": "ccdf3f56dd1dc05a82f6231b54decd34d7551a8f0d434c232792380a52c1f552",
+    "sha256": "a1f94c074cdfac74ba32a83fc9096c1664349954ff8ab064b3efa4adced79558",
     "size": 888
    }
   ]
