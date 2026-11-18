@@ -1209,6 +1209,35 @@ class UpdateWin(Page):
 
 # ====================================================================== หน้าแรก + หน้าต่างหลัก
 NAVY, BG, ACCENT, GREEN, CARD, MUTED = "#1B2A49", "#EEF2F8", "#2F6FED", "#1E9E5A", "#FFFFFF", "#6B7790"
+SIDE, SIDE_HOVER, SIDE_ACT = "#164194", "#2457C5", "#3C9A3C"        # แถบเมนูฟ้าเข้มแบบ XP Luna + ปุ่มเลือกสีเขียว "Start"
+BAR_L, BAR_R = (10, 58, 158), (80, 140, 235)                          # แถบหัวเรื่องไล่สีฟ้า
+
+
+class TitleBar(tk.Canvas):
+    """แถบหัวเรื่องไล่สีแบบ XP (วาดเป็นเส้นแนวตั้งไล่เฉด) ใช้ .config(text=...) เหมือน Label"""
+
+    def __init__(self, parent, font):
+        super().__init__(parent, height=62, highlightthickness=0, bd=0)
+        self.font, self.text = font, ""
+        self.bind("<Configure>", lambda e: self.draw())
+
+    def config(self, **kw):
+        if "text" in kw:
+            self.text = kw.pop("text")
+            self.draw()
+        if kw:
+            super().config(**kw)
+
+    def draw(self):
+        self.delete("all")
+        w, h = max(1, self.winfo_width()), 62
+        step = 4
+        for x in range(0, w, step):
+            t = x / w
+            c = tuple(int(BAR_L[i] + (BAR_R[i] - BAR_L[i]) * t) for i in range(3))
+            self.create_rectangle(x, 0, x + step, h, fill="#%02x%02x%02x" % c, outline="")
+        self.create_rectangle(0, h - 3, w, h, fill="#3C9A3C", outline="")          # เส้นเขียวใต้แถบ
+        self.create_text(22, h / 2 - 1, text=self.text, anchor="w", fill="white", font=self.font)
 
 
 def asset(name):
@@ -1251,6 +1280,20 @@ class HomePage(Page):
         cv.bind("<Configure>", lambda e: cv.itemconfigure(win, width=e.width))
         self.cv = cv
         self.bind_all("<MouseWheel>", self._wheel)
+        left = n - done
+        if not n:
+            nxt = ("import", "เริ่มที่นี่: นำเข้าข้อมูลจากไฟล์ Excel")
+        elif left:
+            nxt = ("record", "ขั้นตอนถัดไป: บันทึกผลการตรวจสอบ (เหลือ %d คน)" % left)
+        elif db.dirty_count():
+            nxt = ("writeback", "ขั้นตอนถัดไป: เขียนผลกลับไฟล์ Excel (%d คน)" % db.dirty_count())
+        else:
+            nxt = ("reg", "ขั้นตอนถัดไป: พิมพ์บัญชีตรวจสอบสภาพ")
+        go = tk.Label(inner, text="▶  " + nxt[1], bg=SIDE_ACT, fg="white", font=(fam, 15, "bold"), anchor="w", padx=22, pady=14, cursor="hand2")
+        go.pack(fill="x", pady=(0, 14))
+        go.bind("<Button-1>", lambda e: app.writeback() if nxt[0] == "writeback" else app.nav(nxt[0]))
+        go.bind("<Enter>", lambda e: go.config(bg="#2F7F2F"))
+        go.bind("<Leave>", lambda e: go.config(bg=SIDE_ACT))
         row = tk.Frame(inner, bg=BG)
         row.pack(fill="x")
         stats = [("รายชื่อทั้งหมด", str(n), "คน", NAVY), ("บันทึกผลแล้ว", str(done), "จาก %d คน" % n, GREEN),
@@ -1259,6 +1302,7 @@ class HomePage(Page):
             row.columnconfigure(i, weight=1, uniform="s")
             f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground="#D8DFEC")
             f.grid(row=0, column=i, sticky="nsew", padx=(0 if i == 0 else 10, 0))
+            tk.Frame(f, bg=c, height=5).pack(fill="x")
             tk.Label(f, text=t, bg=CARD, fg=MUTED, font=(fam, 11)).pack(anchor="w", padx=16, pady=(12, 0))
             tk.Label(f, text=v, bg=CARD, fg=c, font=(fam, 28, "bold")).pack(anchor="w", padx=16)
             tk.Label(f, text=u, bg=CARD, fg=MUTED, font=(fam, 10)).pack(anchor="w", padx=16, pady=(0, 10))
@@ -1268,18 +1312,6 @@ class HomePage(Page):
         tk.Label(inner, bg=BG, fg=MUTED, font=(fam, 11), anchor="w",
                  text=("ไฟล์ข้อมูล: %s  [%s]" % (src, db.source.get("sheet", ""))) if n else "ยังไม่มีข้อมูล — เริ่มที่ขั้นตอน 1 นำเข้าข้อมูลจากไฟล์ Excel").pack(fill="x")
         _progress_table(inner, db, fam)
-        tk.Label(inner, text="เลือกขั้นตอน", bg=BG, fg=NAVY, font=(fam, 15, "bold"), anchor="w").pack(fill="x", pady=(18, 8))
-        grid = tk.Frame(inner, bg=BG)
-        grid.pack(fill="both", expand=True)
-        items = [("1", "นำเข้าข้อมูลจากไฟล์ Excel", "เลือกไฟล์ ชีต แถวเริ่มต้น และจับคู่คอลัมน์ พร้อมดูตัวอย่างก่อนนำเข้า", "import", ACCENT),
-                 ("2", "แบบพิมพ์รายบุคคล + จ่าหน้าซอง", "A4 1 หน้า/คน ให้ผู้ใหญ่บ้านกรอก และซอง DL พร้อมตราครุฑและรหัสไปรษณีย์ (ข้อมูลหน่วยกรอกที่ตั้งค่า)", "form", "#0E7490"),
-                 ("3", "ส่งข้อมูลให้ผู้ใหญ่บ้านตรวจสอบ", "แบบเดียวกับบัญชีสรุป (A4 แนวนอน) ช่อง G-I ว่างให้กรอก มีตัวอย่างลำดับที่ 1", "send", "#7A4FD6"),
-                 ("4", "บันทึกผลการตรวจสอบสภาพ", "ค้นด้วยเลขบัตร/ชื่อ กรอก มีตัว-ไม่มีตัว อาชีพ สถานที่ จังหวัด อำเภอ เบอร์โทร", "record", GREEN),
-                 ("5", "จัดพิมพ์บัญชีตรวจสอบสภาพ", "เลือกประเภททหาร ระดับผู้ลงนาม ตำบล พิมพ์เรียงหมู่ ทีละตำบล/หมู่", "reg", "#D98A00"),
-                 ("6", "บัญชีสรุปผลการตรวจสอบ", "เลือกประเภท (รวมทุกประเภท) ตำบล ผู้ลงนาม และจำนวนชุด", "sum", "#C2410C")]
-        for i, (num, t, d, key, col) in enumerate(items):
-            grid.columnconfigure(i % 2, weight=1, uniform="c")
-            Card(grid, num, t, d, lambda k=key: app.nav(k), col).grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
 
     def _wheel(self, e):
         try:
@@ -1304,7 +1336,7 @@ def _progress_table(self, db, fam):
     box.pack(fill="x", pady=(12, 0))
     tk.Label(box, text="ความคืบหน้าแยกประเภท / ตำบล / หมู่", bg=BG, fg=NAVY, font=(fam, 13, "bold"), anchor="w").pack(fill="x")
     cols = ("all", "done", "left", "pct")
-    tv = ttk.Treeview(box, columns=cols, height=7, selectmode="browse")
+    tv = ttk.Treeview(box, columns=cols, height=12, selectmode="browse")
     tv.heading("#0", text="ประเภท / ตำบล / หมู่")
     for c, t, w in (("all", "ทั้งหมด", 90), ("done", "ดำเนินการแล้ว", 120), ("left", "ยังไม่ดำเนินการ (คงเหลือ)", 190), ("pct", "ร้อยละ", 80)):
         tv.heading(c, text=t)
@@ -1383,19 +1415,17 @@ class App(tk.Tk):
             except tk.TclError:
                 pass
         self.style()
-        self.side = tk.Frame(self, bg=NAVY, width=270)
+        self.side = tk.Frame(self, bg=SIDE, width=270)
         self.side.pack(side="left", fill="y")
         self.side.pack_propagate(False)
         main = tk.Frame(self, bg=BG)
         main.pack(side="left", fill="both", expand=True)
-        top = tk.Frame(main, bg=BG)
-        top.pack(fill="x", padx=24, pady=(18, 6))
-        self.h1 = tk.Label(top, text="", bg=BG, fg=NAVY, font=(self.ui_font, 22, "bold"), anchor="w")
-        self.h1.pack(side="left")
-        self.news = tk.Label(top, text="", bg=BG, fg="#B42318", font=(self.ui_font, 11, "bold"))
-        self.news.pack(side="right")
+        self.h1 = TitleBar(main, (self.ui_font, 20, "bold"))
+        self.h1.pack(fill="x")
+        self.news = tk.Label(self.h1, text="", bg="#%02x%02x%02x" % BAR_R, fg="#FFE680", font=(self.ui_font, 11, "bold"))
+        self.news.place(relx=1.0, x=-18, rely=0.5, anchor="e")
         self.content = tk.Frame(main, bg=BG)
-        self.content.pack(fill="both", expand=True, padx=24, pady=(0, 16))
+        self.content.pack(fill="both", expand=True, padx=24, pady=(16, 16))
         self.build_side()
         self.cur = None
         self.navbtn = {}
@@ -1433,17 +1463,17 @@ class App(tk.Tk):
 
     def build_side(self):
         f = self.ui_font
-        head = tk.Frame(self.side, bg=NAVY)
+        head = tk.Frame(self.side, bg=SIDE)
         head.pack(fill="x", pady=(22, 18), padx=18)
         if self._logo_big:
-            tk.Label(head, image=self._logo_big, bg=NAVY).pack(side="left")
-        tk.Label(head, text="ZAIA\nPrepare Personal", bg=NAVY, fg="white", font=(f, 13, "bold"), justify="left").pack(side="left", padx=10)
+            tk.Label(head, image=self._logo_big, bg=SIDE).pack(side="left")
+        tk.Label(head, text="ZAIA\nPrepare Personal", bg=SIDE, fg="white", font=(f, 13, "bold"), justify="left").pack(side="left", padx=10)
         self.navbtn = {}
         for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("form", "2  แบบพิมพ์รายบุคคล / ซอง"),
                          ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
                          ("sum", "6  บัญชีสรุปผลการตรวจสอบ")):
             self.navbtn[key] = self.side_btn(txt, lambda k=key: self.nav(k))
-        tk.Frame(self.side, bg="#34466E", height=1).pack(fill="x", padx=18, pady=14)
+        tk.Frame(self.side, bg="#5E86D6", height=1).pack(fill="x", padx=18, pady=14)
         self.side_btn("เขียนผลกลับไฟล์ Excel", self.writeback)
         cl = self.side_btn("ล้างข้อมูล  ▾", None)
         m = tk.Menu(self, tearoff=0)
@@ -1454,13 +1484,13 @@ class App(tk.Tk):
         cl.bind("<Button-1>", lambda e: m.tk_popup(cl.winfo_rootx() + 20, cl.winfo_rooty() + 40))
         self.navbtn["settings"] = self.side_btn("ตั้งค่า", lambda: self.nav("settings"))
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
-        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=NAVY, fg="#8FA0C4", font=(f, 10)).pack(side="bottom", pady=12)
+        tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=SIDE, fg="#A9C0F0", font=(f, 10)).pack(side="bottom", pady=12)
 
     def side_btn(self, text, cmd):
-        b = tk.Label(self.side, text=text, bg=NAVY, fg="#E6ECFA", font=(self.ui_font, 12), anchor="w", padx=22, pady=11, cursor="hand2")
+        b = tk.Label(self.side, text=text, bg=SIDE, fg="#EAF1FF", font=(self.ui_font, 12), anchor="w", padx=22, pady=11, cursor="hand2")
         b.pack(fill="x")
-        b.bind("<Enter>", lambda e: b.config(bg="#2B3F6B") if b.cget("bg") != ACCENT else None)
-        b.bind("<Leave>", lambda e: b.config(bg=NAVY) if b.cget("bg") != ACCENT else None)
+        b.bind("<Enter>", lambda e: b.config(bg=SIDE_HOVER) if b.cget("bg") != SIDE_ACT else None)
+        b.bind("<Leave>", lambda e: b.config(bg=SIDE) if b.cget("bg") != SIDE_ACT else None)
         if cmd:
             b.bind("<Button-1>", lambda e: cmd())
         return b
@@ -1492,7 +1522,7 @@ class App(tk.Tk):
         self.cur = mk[key]()
         self.cur.pack(fill="both", expand=True)
         for k, b in self.navbtn.items():
-            b.config(bg=ACCENT if k == key else NAVY, fg="white" if k == key else "#E6ECFA")
+            b.config(bg=SIDE_ACT if k == key else SIDE, fg="white" if k == key else "#EAF1FF")
 
     def go_home(self):
         self.nav("home")
