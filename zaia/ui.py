@@ -161,6 +161,28 @@ class SettingsWin(Page):
         self.zipmsg = ttk.Label(f3, text="")
         ttk.Button(f3, text="คิดรหัสไปรษณีย์จากอำเภอ/จังหวัดของหน่วย", command=self.guess_zip).grid(row=len(rows3) + 1, column=1, sticky="w", pady=6, padx=8)
         self.zipmsg.grid(row=len(rows3) + 2, column=1, sticky="w", padx=8)
+        # ---- ปรับแบบพิมพ์เอง (ข้อความ / ขนาด / ตำแหน่ง / เปิด-ปิดส่วนต่าง ๆ)
+        f4o = ttk.Frame(nb)
+        nb.add(f4o, text="  ปรับแบบพิมพ์  ")
+        top4 = ttk.Frame(f4o, padding=(16, 12, 16, 4))
+        top4.pack(fill="x")
+        ttk.Label(top4, text="เลือกแบบพิมพ์ที่จะปรับ").pack(side="left")
+        names = {k: v[0] for k, v in layout.SCHEMA.items()}
+        self.tpl_kind = tk.StringVar(value=names["form"])
+        cb4 = ttk.Combobox(top4, textvariable=self.tpl_kind, values=list(names.values()), state="readonly", width=34)
+        cb4.pack(side="left", padx=8)
+        cb4.bind("<<ComboboxSelected>>", lambda e: self.tpl_build())
+        ttk.Button(top4, text="ดูตัวอย่าง", command=self.tpl_preview).pack(side="left", padx=4)
+        ttk.Button(top4, text="คืนค่าเริ่มต้นแบบนี้", command=self.tpl_reset).pack(side="left", padx=4)
+        ttk.Label(f4o, text="ตัวแปรที่ใส่ในข้อความได้: {year} ปี  {amphoe} อำเภอ  {province} จังหวัด  {tel} เบอร์สัสดี  {deadline} วันส่งคืน  {ptype} ประเภท  {tambon} ตำบล"
+                  "\nกด “บันทึกการตั้งค่า” ด้านล่างเพื่อใช้จริง (ดูตัวอย่างใช้ค่าที่กำลังแก้อยู่ได้เลยโดยไม่ต้องบันทึก)", foreground="#555", justify="left").pack(anchor="w", padx=16)
+        self.tpl_names = {v: k for k, v in names.items()}
+        self.tpl_vars = {}
+        sc4 = VScroll(f4o)
+        sc4.pack(fill="both", expand=True, padx=16, pady=6)
+        self.tpl_box = ttk.Frame(sc4.inner, padding=4)
+        self.tpl_box.pack(fill="both", expand=True)
+        self.tpl_build()
         # ---- ผู้ลงนาม + ลายเซ็น (ดูตัวอย่างจริง ลากลายเซ็นไปวางได้)
         f2 = ttk.Frame(nb, padding=16)
         nb.add(f2, text="  ผู้ลงนาม / ลายเซ็น  ")
@@ -209,6 +231,70 @@ class SettingsWin(Page):
         ttk.Button(self, text="บันทึกการตั้งค่า", style="Accent.TButton", command=self.save).pack(side="bottom", anchor="e", pady=10)
         nb.pack(fill="both", expand=True)
         self.switch()
+
+    # ---- ปรับแบบพิมพ์
+    def tpl_kindkey(self):
+        return self.tpl_names[self.tpl_kind.get()]
+
+    def tpl_build(self):
+        kind = self.tpl_kindkey()
+        for w in self.tpl_box.winfo_children():
+            w.destroy()
+        vs = self.tpl_vars.setdefault(kind, {})
+        d = layout.tp(self.app.st, kind)
+        for i, (key, lab, typ, dflt) in enumerate(layout.SCHEMA[kind][1]):
+            if key not in vs:
+                vs[key] = tk.BooleanVar(value=bool(d[key])) if typ == "b" else tk.StringVar(value=str(d[key]))
+            if typ == "b":
+                ttk.Checkbutton(self.tpl_box, text=lab, variable=vs[key]).grid(row=i, column=0, columnspan=2, sticky="w", pady=3)
+            else:
+                ttk.Label(self.tpl_box, text=lab).grid(row=i, column=0, sticky="w", pady=3, padx=(0, 10))
+                ttk.Entry(self.tpl_box, textvariable=vs[key], width=70 if typ == "t" else 10).grid(row=i, column=1, sticky="w", pady=3)
+
+    def tpl_collect(self):
+        out = {k: dict(v) for k, v in (self.app.st.get("tpl", {}) or {}).items()}     # ของเดิมที่ยังไม่ได้เปิดดู คงไว้
+        for kind, vs in self.tpl_vars.items():
+            dflt = {k: v for k, _l, _t, v in layout.SCHEMA[kind][1]}
+            typ = {k: t for k, _l, t, _v in layout.SCHEMA[kind][1]}
+            o = {}
+            for k, var in vs.items():
+                v = var.get()
+                if typ[k] == "n":
+                    try:
+                        v = float(v)
+                        v = int(v) if v == int(v) else v
+                    except ValueError:
+                        v = dflt[k]
+                if v != dflt[k]:
+                    o[k] = v
+            if o:
+                out[kind] = o
+            else:
+                out.pop(kind, None)
+        return out
+
+    def tpl_reset(self):
+        kind = self.tpl_kindkey()
+        self.tpl_vars.pop(kind, None)
+        self.app.st.setdefault("tpl", {}).pop(kind, None)
+        self.tpl_build()
+
+    def tpl_preview(self):
+        kind = self.tpl_kindkey()
+        st = dict(self.app.st)
+        for k in ("sad_tel", "deadline", "env_no", "unit_name", "unit_addr", "unit_amphoe", "unit_province", "unit_zip", "amphoe", "province", "year"):
+            if k in self.v:
+                st[k] = self.v[k].get().strip()
+        st["env_pos"] = self.env_pos.get()
+        st["tpl"] = self.tpl_collect()
+        rows = self.app.db.persons[:3] or [dict(rank="ส.อ.", name="สมชาย", surname="ใจดี", nid="1234567890123", year="ทบ.2566", mark="ส.น.0000", branch="พ.",
+                                               father="สมศักดิ์", fsur="ใจดี", mother="สมหญิง", msur="ใจดี", house="99", moo="5", tambon="ตัวอย่าง",
+                                               amphoe=st.get("amphoe", "ตัวอย่าง"), province=st.get("province", "ตัวอย่าง"))]
+        try:
+            pages = layout.build(kind, rows, st, core.ALL_TYPES, "", "อำเภอ")
+        except Exception as e:
+            return err("สร้างตัวอย่างไม่สำเร็จ: %s" % e)
+        PreviewWin(self.app, pages, layout.SCHEMA[kind][0])
 
     def guess_zip(self):
         a = self.v["unit_amphoe"].get().strip() or self.v["amphoe"].get().strip()
@@ -304,6 +390,7 @@ class SettingsWin(Page):
         st["backup"] = self.backup.get()
         st["env_pos"] = self.env_pos.get()
         st["show_tambon_p2"] = self.tam_p2.get()
+        st["tpl"] = self.tpl_collect()
         st["sig_image"], st["sig_level"] = self.sig_path.get(), self.sig_level.get()
         st["sig_w"], st["sig_dx"], st["sig_dy"] = round(self.sig_w.get(), 1), round(self.dx, 2), round(self.dy, 2)
         core.save_settings(st)

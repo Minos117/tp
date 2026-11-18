@@ -20,6 +20,83 @@ FORMS = {
 }
 
 
+# ---- ค่าที่ผู้ใช้ปรับเองได้ (หน้า ตั้งค่า > ปรับแบบพิมพ์)  ชนิด: n=ตัวเลข  t=ข้อความ  b=เปิด/ปิด
+# ตัวแปรในข้อความ: {year} {amphoe} {province} {tel} {deadline} {ptype} {tambon}
+_G = [("dx", "เลื่อนทั้งหน้า ซ้าย(-)/ขวา(+) มม.", "n", 0), ("dy", "เลื่อนทั้งหน้า บน(-)/ล่าง(+) มม.", "n", 0),
+      ("fs", "ขนาดตัวอักษรทั้งแบบ (%)", "n", 100)]
+SCHEMA = {
+    "form": ("แบบพิมพ์รายบุคคล (เมนู 2)", _G + [
+        ("ls", "ระยะห่างระหว่างบรรทัด (%)", "n", 100),
+        ("t_title", "หัวเรื่อง", "t", "รายละเอียดการตรวจสอบสภาพทหารกองหนุน ประจำปี {year}"),
+        ("t_unit", "บรรทัดสัสดี/เบอร์โทร", "t", "สัสดีอำเภอ{amphoe} โทร {tel}"),
+        ("t_return", "ข้อ 5 ส่งคืน (สีแดง)", "t", "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ{amphoe} ภายในวันที่ {deadline}"),
+        ("t_cert", "ข้อความรับรอง", "t", "ขอรับรองว่าได้ตรวจสอบข้อมูลจากทหารกองหนุนจริง"),
+        ("t_headman", "ตำแหน่งผู้ลงนาม", "t", "ผู้ใหญ่บ้าน"),
+        ("t_note1", "หมายเหตุ บรรทัด 1", "t", "หมายเหตุ  ตามพระราชบัญญัติรับราชการทหาร พ.ศ.2497  มาตรา 47  ทหารกองเกินและ"),
+        ("t_note2", "หมายเหตุ บรรทัด 2", "t", "ทหารกองหนุนผู้ใด ไม่มาเข้ารับการเรียกพลเพื่อตรวจสอบ ตามมาตรา 36 ต้องระวางโทษ"),
+        ("t_note3", "หมายเหตุ บรรทัด 3", "t", "ทั้งจำคุกและปรับ"),
+        ("b_status", "แสดงหัวข้อ 3 สถานภาพปัจจุบัน", "b", True),
+        ("b_phone", "แสดงหัวข้อ 4 เบอร์โทรศัพท์", "b", True),
+        ("b_cert", "แสดงช่องรับรอง/ลงชื่อผู้ใหญ่บ้าน", "b", True),
+        ("b_note", "แสดงหมายเหตุท้ายแบบ", "b", True)]),
+    "env": ("จ่าหน้าซอง (เมนู 2)", _G + [
+        ("t_dear", "คำขึ้นต้นผู้รับ", "t", "เรียน"),
+        ("gh", "ความสูงตราครุฑ (มม.)", "n", 25),
+        ("b_garuda", "แสดงตราครุฑ", "b", True),
+        ("b_fold", "แสดงเส้นประรอยพับสาม", "b", True)]),
+    "reg": ("บัญชีตรวจสอบสภาพ (เมนู 5)", _G + [
+        ("t_title", "หัวเรื่อง", "t", "บัญชีตรวจสอบสภาพทหารกองหนุน"),
+        ("t_form", "เลขแบบ (มุมขวาบน)", "t", "ทบ. 100 - 070"),
+        ("t_red", "ข้อความสีแดงมุมขวาบน", "t", "ตรวจสอบสภาพทหารกองหนุนประจำปี {year}")]),
+    "sum": ("บัญชีสรุปผลการตรวจสอบ (เมนู 6)", _G + [
+        ("t_title", "หัวเรื่อง", "t", "บัญชีรายชื่อการตรวจสอบสภาพทหารกองหนุนประจำปี {year} ประเภท {ptype}")]),
+    "send": ("ส่งผู้ใหญ่บ้านตรวจสอบ (เมนู 3)", _G + [
+        ("t_title", "หัวเรื่อง", "t", "บัญชีรายชื่อการตรวจสอบสภาพทหารกองหนุนประจำปี {year} ประเภท {ptype}")]),
+}
+
+
+def tp(st, kind):
+    """ค่าแบบพิมพ์ = ค่าเริ่มต้น + ที่ผู้ใช้ปรับ (st['tpl'][kind])"""
+    d = {k: v for k, _l, _t, v in SCHEMA[kind][1]}
+    d.update({k: v for k, v in (st.get("tpl", {}).get(kind, {}) or {}).items() if k in d})
+    return d
+
+
+def fmt(text, **kw):
+    for k, v in kw.items():
+        text = text.replace("{%s}" % k, str(v))
+    return text
+
+
+def _num(v, default):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _apply_global(pages, o):
+    """เลื่อนทั้งหน้า (dx,dy) และปรับขนาดตัวอักษร (fs%) กับทุกคำสั่งวาด"""
+    dx, dy, fs = _num(o.get("dx"), 0), _num(o.get("dy"), 0), _num(o.get("fs"), 100) / 100.0
+    if not dx and not dy and abs(fs - 1) < 1e-9:
+        return pages
+    for pg in pages:
+        new = []
+        for op in pg.ops:
+            t = op[0]
+            if t == "line":
+                op = (t, op[1] + dx, op[2] + dy, op[3] + dx, op[4] + dy) + op[5:]
+            elif t == "text":
+                op = (t, op[1] + dx, op[2] + dy) + op[3:7] + (op[7] * fs,) + op[8:]
+            elif t == "fill":
+                op = (t, op[1] + dx, op[2] + dy) + op[3:]
+            elif t == "img":
+                op = (t, op[1], op[2] + dx, op[3] + dy) + op[4:]
+            new.append(op)
+        pg.ops = new
+    return pages
+
+
 class Page:
     def __init__(self, w, h):
         self.w, self.h, self.ops = w, h, []
@@ -138,6 +215,7 @@ def build_reg(ctx):
     Lh, pt = LINE * s, 16 * s
     title_h = 26.25 * 25.4 / 72 * s
     hdr_lines = 3
+    o = tp(st, "reg")
     h_title = title_h + 3 * Lh + Lh        # แถว 1-5
     h_tab = hdr_lines * Lh
     avail = g["h"] - g["mt"] - g["mb"]
@@ -149,13 +227,13 @@ def build_reg(ctx):
         pg = Page(g["w"], g["h"])
         y = g["mt"]
         if pn == 0:
-            _t(pg, xs[0], y, tw, title_h, "บัญชีตรวจสอบสภาพทหารกองหนุน", "c", 20 * s, "u")
+            _t(pg, xs[0], y, tw, title_h, fmt(o["t_title"], year=st.get("year", "")), "c", 20 * s, "u")
             # กล่องข้อความมุมขวาบนตามเทมเพลต Excel: "ทบ. 100 - 070" (ชิดขวา) และข้อความสีแดงด้านล่าง (ระยะ EMU/36000 = มม., เว้นขอบกล่อง 2.54 มม.)
             m0, ins = g["mt"], 2.54 * s
             xa, xb = xs[12] + 1.85 * s + ins, xs[13] + 15.6 * s - ins
-            _t(pg, xa, m0 + 0.8 * s + 1.27 * s, xb - xa, Lh, "ทบ. 100 - 070", "r", pt)
+            _t(pg, xa, m0 + 0.8 * s + 1.27 * s, xb - xa, Lh, o["t_form"], "r", pt)
             xa, xb = xs[10] + 15.35 * s + ins, xs[13] + 15.9 * s - ins
-            _t(pg, xa, m0 + 5.8 * s + 1.27 * s, xb - xa, Lh, "ตรวจสอบสภาพทหารกองหนุนประจำปี " + str(st.get("year", 2570)), "l", pt, color=(255, 0, 0))
+            _t(pg, xa, m0 + 5.8 * s + 1.27 * s, xb - xa, Lh, fmt(o["t_red"], year=st.get("year", 2570)), "l", pt, color=(255, 0, 0))
             y += title_h
             tam = ctx.tambon if ctx.tambon else ""
             info = [("สำหรับ", ctx.ptype, "แผนก", "ทหารบก"),
@@ -262,7 +340,7 @@ def build_table(ctx):
     ph = 3 * Lh
     h_tab = 3 * Lh
     year = st.get("year", "2570")
-    title = "บัญชีรายชื่อการตรวจสอบสภาพทหารกองหนุนประจำปี %s ประเภท %s" % (year, ctx.ptype)
+    title = fmt(tp(st, ctx.kind)["t_title"], year=year, ptype=ctx.ptype)
     h_title = 3 * Lh
     avail = g["h"] - g["mt"] - g["mb"]
     block = {"อำเภอ": 5, "กำนัน": 3, "จังหวัด": 1}[ctx.level] * Lh
@@ -365,7 +443,8 @@ def build_form(ctx):
     xs = [g["ml"] + (usable - sum(cw)) / 2]
     for w in cw:
         xs.append(xs[-1] + w)
-    Lh = 23.25 * PT * s
+    o = tp(st, "form")
+    Lh = 23.25 * PT * s * max(0.5, _num(o["ls"], 100) / 100)
     PTS = 18                                    # TH SarabunIT๙ 18 pt (หัวข้อ/ข้อมูล) ป้ายช่องที่อยู่ 16 pt ตามเทมเพลต
     NAVY, RED = (0, 32, 96), (255, 0, 0)
     year = st.get("year", "2570")
@@ -375,7 +454,8 @@ def build_form(ctx):
         top = g["mt"]
 
         def Y(r):                               # แถว 1 (ลำดับที่) ตัดออกแล้ว -> เริ่มที่แถว 2
-            return top + (r - 2) * Lh
+            gap = (9 if not o["b_status"] and r >= 20 else 0) + (4 if not o["b_phone"] and r >= 24 else 0)   # ซ่อนหัวข้อแล้วดึงบรรทัดที่เหลือขึ้นมา
+            return top + (r - 2 - gap) * Lh
 
         def lab(c1, c2, r, text="", al="l", bold=True, u=False, color=None, pt=None):
             _t(pg, xs[c1], Y(r), xs[c2 + 1] - xs[c1], Lh, text, al, pt or PTS, "u" if (u and bold) else bold, "f%s" % (pt or ""), color)
@@ -393,9 +473,11 @@ def build_form(ctx):
             _t(pg, bx + sz + 0.8, Y(r), 30, Lh, text, "l", PTS, True, "f")
 
         am, pv = _p(p, "amphoe") or st.get("amphoe", ""), _p(p, "province") or st.get("province", "")
-        lab(0, 14, 2, "รายละเอียดการตรวจสอบสภาพทหารกองหนุน ประจำปี %s" % year, "c")
+        kw = dict(year=year, amphoe=_p(p, "amphoe") or st.get("amphoe", ""), province=_p(p, "province") or st.get("province", ""),
+                  tel=st.get("sad_tel", ""), deadline=st.get("deadline", ""), tambon=_p(p, "tambon"))
+        lab(0, 14, 2, fmt(o["t_title"], **kw), "c")
         lab(0, 14, 3, "อำเภอ%s   จังหวัด%s" % (am, pv), "c")
-        lab(0, 14, 4, "สัสดีอำเภอ%s โทร %s" % (am, st.get("sad_tel", "")), "c")
+        lab(0, 14, 4, fmt(o["t_unit"], **kw), "c")
         lab(1, 1, 5, "1. ยศ"); val(2, 2, 5, _p(p, "rank"), bold=True)
         lab(3, 3, 5, "ชื่อ"); val(4, 7, 5, _p(p, "name"), bold=True)
         lab(8, 8, 5, "สกุล", "c"); val(9, 12, 5, _p(p, "surname"), bold=True)
@@ -409,33 +491,37 @@ def build_form(ctx):
         lab(10, 10, 9, "ตำบล", "c"); val(11, 13, 9, _p(p, "tambon"))
         lab(1, 2, 10, "อำเภอ", "r", False); val(3, 6, 10, am)
         lab(7, 8, 10, "จังหวัด", "c"); val(9, 12, 10, pv)
-        lab(1, 14, 11, "3  สถานภาพปัจจุบัน ทำเครื่องหมาย / และระบุสถานที่ปัจจุบัน (ให้ระบุ 1 ข้อ)")
+        if o["b_status"]:
+            lab(1, 14, 11, "3  สถานภาพปัจจุบัน ทำเครื่องหมาย / และระบุสถานที่ปัจจุบัน (ให้ระบุ 1 ข้อ)")
 
-        def addr(r):
-            lab(5, 5, r, "อำเภอ", "l", pt=16); val(6, 8, r)
-            lab(9, 9, r, "จังหวัด", "l", pt=16); val(10, 12, r)
-            lab(13, 13, r, "รหัสไปรษณีย์", "c", pt=16); val(14, 14, r)
+            def addr(r):
+                lab(5, 5, r, "อำเภอ", "l", pt=16); val(6, 8, r)
+                lab(9, 9, r, "จังหวัด", "l", pt=16); val(10, 12, r)
+                lab(13, 13, r, "รหัสไปรษณีย์", "c", pt=16); val(14, 14, r)
 
-        box(1, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
-        lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False, pt=16); addr(13)
-        box(1, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
-        lab(9, 9, 14, "คณะ", "c"); val(10, 12, 14); lab(12, 13, 14, "ชั้นปีที่", "r"); val(14, 14, 14)
-        addr(15)
-        box(1, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
-        addr(17)
-        box(1, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
-        lab(0, 3, 19, "     - เช่น ตาย", "l", False, pt=16); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
-        lab(1, 14, 20, "4  เบอร์โทรศัพท์ที่สามารถติดต่อได้ (กรณีกองทัพบกเรียกพลฯ เพื่อฝึกหรือเพื่อตรวจสอบ)")
-        for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
-            lab(1, 6, r, tx, "r"); val(7, 12, r); lab(13, 13, r, "โปรดระบุ", "l", False, color=RED)
-        lab(1, 14, 24, "5.กรุณาส่งคืน  หน่วยสัสดีอำเภอ%s ภายในวันที่ %s" % (am, st.get("deadline", "")), "l", True, True, RED)
-        lab(5, 13, 25, "ขอรับรองว่าได้ตรวจสอบข้อมูลจากทหารกองหนุนจริง", "l", False)
-        lab(5, 5, 26, "(ลงชื่อ)"); val(6, 10, 26); lab(11, 14, 26, "ผู้ใหญ่บ้าน", "l", False)
-        lab(6, 6, 27, "(", "l", False); lab(10, 10, 27, ")", "r", False)       # วงเล็บซ้าย-ขวายาวเท่าเส้นลงชื่อ
-        _ln(pg, xs[6] + 3, Y(27) + Lh * 0.8, xs[11] - 3, Y(27) + Lh * 0.8, 0.2, True)
-        lab(1, 14, 29, "หมายเหตุ  ตามพระราชบัญญัติรับราชการทหาร พ.ศ.2497  มาตรา 47  ทหารกองเกินและ")
-        lab(2, 14, 30, "ทหารกองหนุนผู้ใด ไม่มาเข้ารับการเรียกพลเพื่อตรวจสอบ ตามมาตรา 36 ต้องระวางโทษ")
-        lab(2, 14, 31, "ทั้งจำคุกและปรับ")
+            box(1, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
+            lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False, pt=16); addr(13)
+            box(1, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
+            lab(9, 9, 14, "คณะ", "c"); val(10, 12, 14); lab(12, 13, 14, "ชั้นปีที่", "r"); val(14, 14, 14)
+            addr(15)
+            box(1, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
+            addr(17)
+            box(1, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
+            lab(0, 3, 19, "     - เช่น ตาย", "l", False, pt=16); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
+        if o["b_phone"]:
+            lab(1, 14, 20, "4  เบอร์โทรศัพท์ที่สามารถติดต่อได้ (กรณีกองทัพบกเรียกพลฯ เพื่อฝึกหรือเพื่อตรวจสอบ)")
+            for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
+                lab(1, 6, r, tx, "r"); val(7, 12, r); lab(13, 13, r, "โปรดระบุ", "l", False, color=RED)
+        lab(1, 14, 24, fmt(o["t_return"], **kw), "l", True, True, RED)
+        if o["b_cert"]:
+            lab(5, 13, 25, fmt(o["t_cert"], **kw), "l", False)
+            lab(5, 5, 26, "(ลงชื่อ)"); val(6, 10, 26); lab(11, 14, 26, fmt(o["t_headman"], **kw), "l", False)
+            lab(6, 6, 27, "(", "l", False); lab(10, 10, 27, ")", "r", False)       # วงเล็บซ้าย-ขวายาวเท่าเส้นลงชื่อ
+            _ln(pg, xs[6] + 3, Y(27) + Lh * 0.8, xs[11] - 3, Y(27) + Lh * 0.8, 0.2, True)
+        if o["b_note"]:
+            lab(1, 14, 29, fmt(o["t_note1"], **kw))
+            lab(2, 14, 30, fmt(o["t_note2"], **kw))
+            lab(2, 14, 31, fmt(o["t_note3"], **kw))
         pages.append(pg)
     return pages
 
@@ -445,6 +531,7 @@ def build_env(ctx):
     g, st = ctx.g, ctx.st
     from . import core
     pages = []
+    o = tp(st, "env")
     y0 = {"บน": 0.0, "กลาง": 99.0, "ล่าง": 198.0}.get(str(st.get("env_pos", "บน")).replace("ส่วน", ""), 0.0)
     ua = st.get("unit_amphoe") or st.get("amphoe", "") or st.get("_amphoe", "")
     up = st.get("unit_province") or st.get("province", "") or st.get("_province", "")
@@ -459,11 +546,12 @@ def build_env(ctx):
         gr = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "garuda.png")
     for p in ctx.persons:
         pg = Page(g["w"], g["h"])
-        for fy in (99.0, 198.0):                                 # เส้นประรอยพับสาม
-            _ln(pg, 4, fy, g["w"] - 4, fy, 0.15, True)
+        if o["b_fold"]:
+            for fy in (99.0, 198.0):                             # เส้นประรอยพับสาม
+                _ln(pg, 4, fy, g["w"] - 4, fy, 0.15, True)
         sx = 14
-        if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
-            gh = 25.0
+        if o["b_garuda"] and os.path.exists(gr):                 # ตราครุฑมุมซ้ายบน สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
+            gh = _num(o["gh"], 25)
             gw = gh * 253 / 199
             pg.ops.append(("img", gr, 14, y0 + 10, gw, gh))
             sx = 14 + gw + 3
@@ -475,7 +563,7 @@ def build_env(ctx):
         z = core.zip_lookup(pv, am, _p(p, "tambon"))
         name = ("%s %s  %s" % (_p(p, "rank"), _p(p, "name"), _p(p, "surname"))).replace("  ", " ").strip()
         rx, ry, rh = 88, y0 + 52, 9.5                             # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
-        _t(pg, rx, ry, 16, rh, "เรียน", "l", 18, False, "e")
+        _t(pg, rx, ry, 16, rh, o["t_dear"], "l", 18, False, "e")
         rows = [name, "บ้านเลขที่ %s หมู่ที่ %s ตำบล%s" % (_p(p, "house"), _p(p, "moo"), _p(p, "tambon")),
                 "อำเภอ%s จังหวัด%s" % (am, pv), z]
         for i, tx in enumerate(rows):
@@ -496,7 +584,9 @@ def build(kind, persons, st, ptype, tambon, level):
     if not persons:
         return []
     if kind == "form":
-        return build_form(ctx)
-    if kind == "env":
-        return build_env(ctx)
-    return build_reg(ctx) if kind == "reg" else build_table(ctx)
+        pages = build_form(ctx)
+    elif kind == "env":
+        pages = build_env(ctx)
+    else:
+        pages = build_reg(ctx) if kind == "reg" else build_table(ctx)
+    return _apply_global(pages, tp(st, kind))
