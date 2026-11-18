@@ -29,6 +29,49 @@ class Spin(ttk.Spinbox):
     pass
 
 
+LOG_BG, LOG_FG = "#0C0C0C", "#D4D4D4"
+_LOG_KEYS = (("err", ("ผิดพลาด", "Error", "error", "ไม่สำเร็จ", "ล้มเหลว", "Traceback")),
+             ("warn", ("ยกเลิก", "หยุด", "เตือน", "ข้าม", "ไม่พบ", "ยังไม่")),
+             ("ok", ("เสร็จ", "สำเร็จ", "ส่งพิมพ์แล้ว", "ตรงกัน", "เป็นรุ่นล่าสุด", "อัปเดตแล้ว")),
+             ("info", ("→", "มีรุ่นใหม่", "ไฟล์", "รุ่น ")))
+
+
+def make_log(parent, **kw):
+    """ช่อง log พื้นดำ ข้อความหลายสีแบบคอนโซล Python"""
+    t = tk.Text(parent, bg=LOG_BG, fg=LOG_FG, insertbackground="white", relief="flat", padx=10, pady=8,
+                font=("Consolas", 11), state="disabled", wrap="word", **kw)
+    for tag, col in (("ts", "#7A7A7A"), ("err", "#FF5C57"), ("warn", "#F3F99D"), ("ok", "#5AF78E"), ("info", "#57C7FF"), ("head", "#FF6AC1")):
+        t.tag_config(tag, foreground=col)
+    return t
+
+
+def log_line(t, line):
+    """เขียน 1 บรรทัดลง make_log: [เวลา] เทา + ข้อความสีตามเนื้อหา"""
+    t.config(state="normal")
+    ts = ""
+    if line.startswith("[") and "]" in line[:12]:
+        i = line.index("]") + 1
+        ts, line = line[:i], line[i:]
+    tag = ""
+    for name, keys in _LOG_KEYS:
+        if any(k in line for k in keys):
+            tag = name
+            break
+    if ts:
+        t.insert("end", ts, "ts")
+    t.insert("end", line if line.endswith("\n") else line + "\n", tag)
+    t.see("end")
+    t.config(state="disabled")
+
+
+def log_set(t, s):
+    t.config(state="normal")
+    t.delete("1.0", "end")
+    t.config(state="disabled")
+    for ln in s.splitlines():
+        log_line(t, ln)
+
+
 class Page(ttk.Frame):
     """หน้าเนื้อหาในหน้าต่างหลัก (เดิมเป็นหน้าต่างย่อย) — shim ให้โค้ดเดิมใช้ได้"""
 
@@ -100,19 +143,25 @@ class VScroll(ttk.Frame):
 
     def __init__(self, parent, bg=None):
         super().__init__(parent)
-        self.cv = tk.Canvas(self, highlightthickness=0, **({"bg": bg} if bg else {}))
+        self.cv = tk.Canvas(self, highlightthickness=0, bg=bg or BG)
         sb = ttk.Scrollbar(self, orient="vertical", command=self.cv.yview)
         self.cv.configure(yscrollcommand=sb.set)
         self.inner = ttk.Frame(self.cv)
         self._win = self.cv.create_window((0, 0), window=self.inner, anchor="nw")
         self.inner.bind("<Configure>", self._cfg)
+        self.cv.bind("<Configure>", self._fit)
         sb.pack(side="right", fill="y")
         self.cv.pack(side="left", fill="both", expand=True)
         self.cv.bind("<Enter>", lambda e: self.cv.bind_all("<MouseWheel>", lambda ev: self.cv.yview_scroll(-1 * (ev.delta // 120), "units")))
         self.cv.bind("<Leave>", lambda e: self.cv.unbind_all("<MouseWheel>"))
 
+    def _fit(self, e):
+        """ให้เนื้อหากว้างเต็มกรอบ และสูงอย่างน้อยเท่ากรอบ (พื้นถมเต็ม ไม่เห็นสีเทาของ canvas)"""
+        self.cv.itemconfigure(self._win, width=e.width, height=max(e.height, self.inner.winfo_reqheight()))
+
     def _cfg(self, e):
-        self.cv.configure(scrollregion=self.cv.bbox("all"), width=self.inner.winfo_reqwidth())
+        self.cv.configure(scrollregion=self.cv.bbox("all"))
+        self.cv.itemconfigure(self._win, height=max(self.cv.winfo_height(), self.inner.winfo_reqheight()))
 
 
 class SettingsWin(Page):
@@ -577,89 +626,121 @@ class RecordWin(Page):
     def __init__(self, app):
         super().__init__(app)
         self.title("บันทึกผลการตรวจสอบสภาพ")
-        self.geometry("1120x680")
         self.app, self.db = app, app.db
         self.cur = None
+        fam = app.ui_font
+        self.F = tkfont.Font(family=fam, size=11)                    # ฟอนต์ปรับขนาดอัตโนมัติตามขนาดหน้าต่าง
+        self.FB = tkfont.Font(family=fam, size=13, weight="bold")
+        self.FL = tkfont.Font(family="Tahoma", size=11)
+        self.FH = tkfont.Font(family=fam, size=18, weight="bold")
+        stl = ttk.Style()
+        for nm in ("Rec.TLabel", "Rec.TCheckbutton", "Rec.TRadiobutton"):
+            stl.configure(nm, font=self.F)
+        stl.configure("Rec.TButton", font=self.F)
+        stl.configure("Rec.Accent.TButton", font=self.FB)
+        self._k = None
         left = ttk.Frame(self, padding=6)
         left.pack(side="left", fill="y")
-        ttk.Label(left, text="ค้นหา (เลขบัตร / ชื่อ / สกุล)").pack(anchor="w")
+        ttk.Label(left, text="ค้นหา (เลขบัตร / ชื่อ / สกุล)", style="Rec.TLabel").pack(anchor="w")
         self.q = tk.StringVar()
-        e = ttk.Entry(left, textvariable=self.q, width=34)
+        e = ttk.Entry(left, textvariable=self.q, width=30, font=self.F)
         e.pack(fill="x")
         e.bind("<KeyRelease>", lambda ev: self.refill())
         e.bind("<Return>", lambda ev: self.pick_first())
         self.tam = tk.StringVar(value=core.ALL_TAMBON)
-        cb = ttk.Combobox(left, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons(), state="readonly")
+        cb = ttk.Combobox(left, textvariable=self.tam, values=[core.ALL_TAMBON] + self.db.tambons(), state="readonly", font=self.F)
         cb.pack(fill="x", pady=3)
         cb.bind("<<ComboboxSelected>>", lambda ev: self.refill())
         self.only = tk.BooleanVar()
-        ttk.Checkbutton(left, text="เฉพาะที่ยังไม่บันทึก", variable=self.only, command=self.refill).pack(anchor="w")
+        ttk.Checkbutton(left, text="เฉพาะที่ยังไม่บันทึก", variable=self.only, command=self.refill, style="Rec.TCheckbutton").pack(anchor="w")
         fr = ttk.Frame(left)
         fr.pack(fill="both", expand=True)
-        self.lb = tk.Listbox(fr, width=38, exportselection=False, font=("Tahoma", 11))
+        self.lb = tk.Listbox(fr, width=34, exportselection=False, font=self.FL, activestyle="none")
         sc = ttk.Scrollbar(fr, command=self.lb.yview)
         self.lb.config(yscrollcommand=sc.set)
         self.lb.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
         self.lb.bind("<<ListboxSelect>>", lambda ev: self.on_select())
-        self.prog = ttk.Label(left, text="")
+        self.prog = ttk.Label(left, text="", style="Rec.TLabel")
         self.prog.pack(anchor="w")
-        right = ttk.Frame(self, padding=10)
-        right.pack(side="left", fill="both", expand=True)
-        self.saved = tk.Label(right, text="", fg="#15803D", bg=BG, font=(app.ui_font, 13, "bold"), anchor="w", padx=8)
+        vs = VScroll(self)
+        vs.pack(side="left", fill="both", expand=True)
+        right = ttk.Frame(vs.inner, padding=10)
+        right.pack(fill="both", expand=True)
+        self.saved = tk.Label(right, text="", fg="#15803D", bg=BG, font=self.FB, anchor="w", padx=8)
         self.saved.pack(fill="x", pady=(0, 6))          # แถบข้อความ "บันทึกข้อมูลแล้ว" อยู่บนสุด มองเห็นเสมอ
         self._saved_job = None
-        self.head = ttk.Label(right, text="— เลือกรายชื่อทางซ้าย —", font=BIG)
+        self.head = ttk.Label(right, text="— เลือกรายชื่อทางซ้าย —", font=self.FH)
         self.head.pack(anchor="w")
-        self.sub = ttk.Label(right, text="", wraplength=700)
+        self.sub = ttk.Label(right, text="", wraplength=700, style="Rec.TLabel")
+        right.bind("<Configure>", lambda e: self.sub.config(wraplength=max(300, e.width - 30)))
         self.sub.pack(anchor="w", pady=(0, 8))
         g = ttk.Frame(right)
         g.pack(fill="x")
+        g.columnconfigure(1, weight=1)
         self.v = {k: tk.StringVar() for k in ("result", "occ", "detail", "place", "province", "amphoe2", "tel", "tel_par", "tel_work")}
         r = 0
-        ttk.Label(g, text="ผลการตรวจ").grid(row=r, column=0, sticky="w", pady=4)
+        ttk.Label(g, text="ผลการตรวจ", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
         rf = ttk.Frame(g)
-        rf.grid(row=r, column=1, sticky="w")
-        ttk.Radiobutton(rf, text="มีตัว", value="มีตัว", variable=self.v["result"]).pack(side="left", padx=6)
-        ttk.Radiobutton(rf, text="ไม่มีตัว", value="ไม่มีตัว", variable=self.v["result"]).pack(side="left", padx=6)
+        rf.grid(row=r, column=1, sticky="we")
+        ttk.Radiobutton(rf, text="มีตัว", value="มีตัว", variable=self.v["result"], style="Rec.TRadiobutton").pack(side="left", padx=6)
+        ttk.Radiobutton(rf, text="ไม่มีตัว", value="ไม่มีตัว", variable=self.v["result"], style="Rec.TRadiobutton").pack(side="left", padx=6)
         r += 1
-        ttk.Label(g, text="อาชีพ/สถานภาพ").grid(row=r, column=0, sticky="w", pady=4)
-        self.occ = ttk.Combobox(g, textvariable=self.v["occ"], values=core.OCCUPATIONS, width=28)
-        self.occ.grid(row=r, column=1, sticky="w")
+        ttk.Label(g, text="อาชีพ/สถานภาพ", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
+        self.occ = ttk.Combobox(g, textvariable=self.v["occ"], values=core.OCCUPATIONS, width=18, font=self.F)
+        self.occ.grid(row=r, column=1, sticky="we")
         self.occ.bind("<<ComboboxSelected>>", lambda ev: self.occ_changed())
         r += 1
-        ttk.Label(g, text="รายละเอียด ( )").grid(row=r, column=0, sticky="w")
-        self.det = ttk.Entry(g, textvariable=self.v["detail"], width=40, state="disabled")
-        self.det.grid(row=r, column=1, sticky="w", pady=3)
+        ttk.Label(g, text="รายละเอียด ( )", style="Rec.TLabel").grid(row=r, column=0, sticky="w")
+        self.det = ttk.Entry(g, textvariable=self.v["detail"], width=18, state="disabled", font=self.F)
+        self.det.grid(row=r, column=1, sticky="we", pady=3)
         r += 1
-        ttk.Label(g, text="สถานที่").grid(row=r, column=0, sticky="w", pady=4)
+        ttk.Label(g, text="สถานที่", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
         pf = ttk.Frame(g)
-        pf.grid(row=r, column=1, sticky="w")
-        ttk.Entry(pf, textvariable=self.v["place"], width=36).pack(side="left")
-        ttk.Button(pf, text="คลิก ใส่ที่อยู่ตามภูมิลำเนา", command=self.domicile).pack(side="left", padx=6)
+        pf.grid(row=r, column=1, sticky="we")
+        ttk.Entry(pf, textvariable=self.v["place"], width=14, font=self.F).pack(fill="x")
+        ttk.Button(pf, text="คลิก ใส่ที่อยู่ตามภูมิลำเนา", command=self.domicile, style="Rec.TButton").pack(anchor="w", pady=3)
         r += 1
-        ttk.Label(g, text="จังหวัด").grid(row=r, column=0, sticky="w", pady=4)
-        self.cp = ttk.Combobox(g, textvariable=self.v["province"], values=sorted(GEO), width=28)
-        self.cp.grid(row=r, column=1, sticky="w")
+        ttk.Label(g, text="จังหวัด", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
+        self.cp = ttk.Combobox(g, textvariable=self.v["province"], values=sorted(GEO), width=18, font=self.F)
+        self.cp.grid(row=r, column=1, sticky="we")
         self.cp.bind("<<ComboboxSelected>>", lambda ev: self.prov_changed())
         r += 1
-        ttk.Label(g, text="อำเภอ / เขต").grid(row=r, column=0, sticky="w", pady=4)
-        self.ca = ttk.Combobox(g, textvariable=self.v["amphoe2"], width=28)
-        self.ca.grid(row=r, column=1, sticky="w")
+        ttk.Label(g, text="อำเภอ / เขต", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
+        self.ca = ttk.Combobox(g, textvariable=self.v["amphoe2"], width=18, font=self.F)
+        self.ca.grid(row=r, column=1, sticky="we")
         for k, lab in (("tel", "โทรศัพท์ (เจ้าตัว)"), ("tel_par", "โทรศัพท์ (ผู้ปกครอง)"), ("tel_work", "โทรศัพท์ (ที่ทำงาน)")):
             r += 1
-            ttk.Label(g, text=lab).grid(row=r, column=0, sticky="w", pady=4)
-            ttk.Entry(g, textvariable=self.v[k], width=30).grid(row=r, column=1, sticky="w")
+            ttk.Label(g, text=lab, style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
+            ttk.Entry(g, textvariable=self.v[k], width=18, font=self.F).grid(row=r, column=1, sticky="we")
         bt = ttk.Frame(right)
         bt.pack(fill="x", pady=14)
-        ttk.Button(bt, text="◀ ก่อนหน้า", command=lambda: self.step(-1)).pack(side="left")
-        ttk.Button(bt, text="ถัดไป ▶", command=lambda: self.step(1)).pack(side="left", padx=4)
-        ttk.Button(bt, text="บันทึก", style="Accent.TButton", command=lambda: self.save(False)).pack(side="left", padx=14)
-        ttk.Button(bt, text="บันทึกแล้วไปคนต่อไป", style="Accent.TButton", command=lambda: self.save(True)).pack(side="left")
-        ttk.Button(bt, text="ล้างผลคนนี้", command=self.clear_one).pack(side="right")
+        ttk.Button(bt, text="◀ ก่อนหน้า", command=lambda: self.step(-1), style="Rec.TButton").pack(side="left")
+        ttk.Button(bt, text="ถัดไป ▶", command=lambda: self.step(1), style="Rec.TButton").pack(side="left", padx=4)
+        ttk.Button(bt, text="บันทึก", style="Rec.Accent.TButton", command=lambda: self.save(False)).pack(side="left", padx=14)
+        ttk.Button(bt, text="บันทึกแล้วไปคนต่อไป", style="Rec.Accent.TButton", command=lambda: self.save(True)).pack(side="left")
+        ttk.Button(bt, text="ล้างผลคนนี้", command=self.clear_one, style="Rec.TButton").pack(side="right")
         self.view = []
         self.refill()
         e.focus_set()
+        self.bind("<Configure>", self._rescale)
+
+    def _rescale(self, ev):
+        """ขยาย/ย่อฟอนต์และปุ่มตามขนาดหน้าต่างอัตโนมัติ (0.9x - 1.5x) เพื่อให้อ่านง่ายทั้งจอใหญ่และแท็บเล็ต"""
+        if ev.widget is not self:
+            return
+        self.lb.config(width=24 if ev.width < 1000 else 34)
+        k = round(max(0.9, min(1.5, min(ev.width / 1000.0, ev.height / 640.0))) * 10) / 10
+        if k == self._k:
+            return
+        self._k = k
+        self.F.configure(size=round(11 * k))
+        self.FL.configure(size=round(11 * k))
+        self.FB.configure(size=round(13 * k))
+        self.FH.configure(size=round(18 * k))
+        stl = ttk.Style()
+        stl.configure("Rec.TButton", padding=(round(12 * k), round(7 * k)))
+        stl.configure("Rec.Accent.TButton", padding=(round(14 * k), round(8 * k)))
 
     # ---- รายการ
     def refill(self):
@@ -861,7 +942,7 @@ class PrintWin(Page):
             ttk.Button(bf, text=txt, command=cmd, style=stl).pack(side="left", padx=3)
         ttk.Button(bf, text="ยกเลิก (Esc)", command=self.stop).pack(side="right", padx=3)
         ttk.Button(bf, text="ล้างสถานะพิมพ์แล้ว", command=self.reset_marks).pack(side="right", padx=3)
-        self.log = tk.Text(self, height=18, font=("Consolas", 11), state="disabled")
+        self.log = make_log(self, height=18)
         self.log.pack(fill="both", expand=True, padx=10, pady=6)
         self.bind("<Escape>", lambda e: self.stop())
         self.protocol("WM_DELETE_WINDOW", self.close)
@@ -920,10 +1001,7 @@ class PrintWin(Page):
             pass
 
     def _say(self, line):
-        self.log.config(state="normal")
-        self.log.insert("end", line)
-        self.log.see("end")
-        self.log.config(state="disabled")
+        log_line(self.log, line)
 
     def stop(self):
         if self.busy:
@@ -1107,8 +1185,8 @@ class PersonalWin(PrintWin):
         ttk.Button(bf, text="พิมพ์ทั้งหมดที่เลือก", style="Accent.TButton", command=lambda: self.go(False)).pack(side="left", padx=3)
         ttk.Button(bf, text="ยกเลิก (Esc)", command=self.stop).pack(side="left", padx=12)
         ttk.Button(body, text="ล้างสถานะ “พิมพ์แล้ว” ของงานนี้", command=self.reset_marks).pack(anchor="w")
-        self.log = tk.Text(body, height=7, width=84, font=("Consolas", 10), state="disabled")
-        self.log.pack(anchor="w", pady=8)
+        self.log = make_log(body, height=9)
+        self.log.pack(fill="x", pady=8)
         self.bind("<Escape>", lambda e: self.stop())
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.upd()
@@ -1230,16 +1308,13 @@ class UpdateWin(Page):
         ttk.Label(f, text="ลิงก์ (GitHub Raw):").pack(side="left")
         ttk.Entry(f, textvariable=self.url, width=60).pack(side="left", padx=4)
         ttk.Button(self, text="ตรวจสอบ", command=self.check).pack(pady=6)
-        self.box = tk.Text(self, height=14, state="disabled")
+        self.box = make_log(self, height=14)
         self.box.pack(fill="both", expand=True, padx=8)
         self.btn = ttk.Button(self, text="ดาวน์โหลดและอัปเดต", command=self.apply, state="disabled")
         self.btn.pack(pady=8)
 
     def put(self, s):
-        self.box.config(state="normal")
-        self.box.delete("1.0", "end")
-        self.box.insert("1.0", s)
-        self.box.config(state="disabled")
+        log_set(self.box, s)
 
     def check(self):
         self.btn.config(state="disabled")
