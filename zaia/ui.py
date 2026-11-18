@@ -137,6 +137,122 @@ class PreviewWin(tk.Toplevel):
         self.lbl.config(text="หน้า %d / %d" % (self.i + 1, len(self.pages)))
 
 
+class EnvEditor(tk.Toplevel):
+    """จัดวางจ่าหน้าซองอิสระ: ลากตราครุฑ/ผู้ส่ง/ที่/ผู้รับ ด้วยเมาส์หรือนิ้ว (ปุ่มลูกศรเลื่อนทีละ 0.5 มม.) และย่อ/ขยายได้"""
+
+    def __init__(self, app, st, person):
+        super().__init__(app)
+        self.title("จัดวางจ่าหน้าซองอิสระ")
+        self.app, self.st, self.person = app, dict(st), person
+        self.adj = {k: list(v) for k, v in (st.get("env_adj") or {}).items()}
+        self.sel = tk.StringVar(value="garuda")
+        sw = self.winfo_screenwidth()
+        self.k = max(2.0, min(4.2, (sw - 40) / 210.0))
+        try:
+            self.state("zoomed")
+        except tk.TclError:
+            self.attributes("-zoomed", True)
+        y0 = {"บน": 0.0, "กลาง": 99.0, "ล่าง": 198.0}.get(str(st.get("env_pos", "บน")).replace("ส่วน", ""), 0.0)
+        self.y0 = y0
+        top = ttk.Frame(self, padding=6)
+        top.pack(fill="x")
+        for key, lab in layout.ENV_ITEMS:
+            ttk.Radiobutton(top, text=lab, value=key, variable=self.sel, command=self.draw).pack(side="left", padx=6)
+        ttk.Label(top, text="ลากชิ้นงานด้วยเมาส์ได้เลย").pack(side="left", padx=10)
+        self.cv = tk.Canvas(self, bg="#777", highlightthickness=0, width=int(210 * self.k), height=int(99 * self.k))
+        self.cv.pack(padx=8, pady=4)
+        self.info = ttk.Label(self, text="", font=(app.ui_font, 11, "bold"))
+        self.info.pack()
+        bt = ttk.Frame(self, padding=6)
+        bt.pack(fill="x")
+        for txt, d in (("◀", (-0.5, 0)), ("▶", (0.5, 0)), ("▲", (0, -0.5)), ("▼", (0, 0.5))):
+            ttk.Button(bt, text=txt, width=4, command=lambda d=d: self.nudge(*d)).pack(side="left", padx=2)
+        ttk.Button(bt, text="ย่อ −", command=lambda: self.scale(-5)).pack(side="left", padx=(14, 2))
+        ttk.Button(bt, text="ขยาย +", command=lambda: self.scale(5)).pack(side="left", padx=2)
+        ttk.Button(bt, text="คืนชิ้นนี้", command=self.reset_one).pack(side="left", padx=(14, 2))
+        ttk.Button(bt, text="คืนทั้งหมด", command=self.reset_all).pack(side="left", padx=2)
+        ttk.Button(bt, text="ยกเลิก", command=self.destroy).pack(side="right", padx=2)
+        ttk.Button(bt, text="บันทึกตำแหน่ง", style="Accent.TButton", command=self.ok).pack(side="right", padx=8)
+        self.cv.bind("<Button-1>", self.down)
+        self.cv.bind("<B1-Motion>", self.move)
+        for key, d in (("Left", (-0.5, 0)), ("Right", (0.5, 0)), ("Up", (0, -0.5)), ("Down", (0, 0.5))):
+            self.bind("<%s>" % key, lambda e, d=d: self.nudge(*d))
+        self.bind("<Escape>", lambda e: self.destroy())
+        self._last = None
+        self.draw()
+
+    def page(self):
+        st = dict(self.st)
+        st["env_adj"] = self.adj
+        return layout.build("env", [self.person], st, core.ALL_TYPES, "", "อำเภอ")[0]
+
+    def draw(self):
+        pg = self.page()
+        k = self.k
+        render.draw_tk(self.cv, pg, k, self.app.font_family(), tkfont)
+        self.cv.configure(scrollregion=(0, self.y0 * k, 210 * k, (self.y0 + 99) * k))
+        self.cv.xview_moveto(0)
+        self.cv.yview_moveto(self.y0 / pg.h)
+        b = layout.env_boxes(pg).get(self.sel.get())
+        if b:
+            self.cv.create_rectangle(b[0] * k, b[1] * k, b[2] * k, b[3] * k, outline="#245EDC", width=2, dash=(5, 3))
+        a = self.adj.get(self.sel.get()) or [0, 0, 100]
+        a = list(a) + [0, 0, 100][len(a):]
+        self.info.config(text="%s :  ซ้าย/ขวา %+.1f มม.   บน/ล่าง %+.1f มม.   ขนาด %d%%" % (dict(layout.ENV_ITEMS)[self.sel.get()], a[0], a[1], a[2]))
+        self._boxes = layout.env_boxes(pg)
+
+    def cur(self):
+        a = self.adj.setdefault(self.sel.get(), [0, 0, 100])
+        while len(a) < 3:
+            a.append(100 if len(a) == 2 else 0)
+        return a
+
+    def down(self, e):
+        x, y = self.cv.canvasx(e.x) / self.k, self.cv.canvasy(e.y) / self.k
+        hit = [(n, b) for n, b in self._boxes.items() if n != "fold" and b[0] <= x <= b[2] and b[1] <= y <= b[3]]
+        if hit:
+            hit.sort(key=lambda t: (t[1][2] - t[1][0]) * (t[1][3] - t[1][1]))      # ชิ้นเล็กสุดที่ถูกจุดนั้น
+            self.sel.set(hit[0][0])
+        self._last = (x, y)
+        self.draw()
+
+    def move(self, e):
+        if not self._last:
+            return
+        x, y = self.cv.canvasx(e.x) / self.k, self.cv.canvasy(e.y) / self.k
+        a = self.cur()
+        a[0] = round(a[0] + x - self._last[0], 2)
+        a[1] = round(a[1] + y - self._last[1], 2)
+        self._last = (x, y)
+        self.draw()
+
+    def nudge(self, dx, dy):
+        a = self.cur()
+        a[0] += dx
+        a[1] += dy
+        self.draw()
+
+    def scale(self, d):
+        a = self.cur()
+        a[2] = max(30, min(300, a[2] + d))
+        self.draw()
+
+    def reset_one(self):
+        self.adj.pop(self.sel.get(), None)
+        self.draw()
+
+    def reset_all(self):
+        self.adj.clear()
+        self.draw()
+
+    def ok(self):
+        clean = {k: [round(x, 2) for x in v[:3]] for k, v in self.adj.items() if v and (abs(v[0]) > 1e-6 or abs(v[1]) > 1e-6 or abs((v[2] if len(v) > 2 else 100) - 100) > 1e-6)}
+        self.app.st["env_adj"] = clean
+        core.save_settings(self.app.st)
+        self.destroy()
+        messagebox.showinfo("บันทึกแล้ว", "บันทึกตำแหน่งจ่าหน้าซองแล้ว (ใช้กับการพิมพ์และตัวอย่างทันที)")
+
+
 # ====================================================================== ตั้งค่า
 class VScroll(ttk.Frame):
     """กรอบเลื่อนขึ้นลงได้ (แถบเลื่อน + ล้อเมาส์) ใส่เนื้อหาใน .inner — กันปุ่ม/ช่องตกจอเมื่อหน้าต่างเตี้ย"""
@@ -299,6 +415,20 @@ class SettingsWin(Page):
             else:
                 ttk.Label(self.tpl_box, text=lab).grid(row=i, column=0, sticky="w", pady=3, padx=(0, 10))
                 ttk.Entry(self.tpl_box, textvariable=vs[key], width=70 if typ == "t" else 10).grid(row=i, column=1, sticky="w", pady=3)
+        if kind == "env":
+            ttk.Button(self.tpl_box, text="จัดวางอิสระ (ลากตราครุฑ/ที่อยู่ ตามใจ)", style="Accent.TButton",
+                       command=self.env_edit).grid(row=len(layout.SCHEMA[kind][1]) + 1, column=0, columnspan=2, sticky="w", pady=12)
+
+    def env_edit(self):
+        st = dict(self.app.st)
+        for k in ("unit_name", "unit_addr", "unit_amphoe", "unit_province", "unit_zip", "env_no", "amphoe", "province"):
+            if k in self.v:
+                st[k] = self.v[k].get().strip()
+        st["env_pos"] = self.env_pos.get()
+        st["tpl"] = self.tpl_collect()
+        rows = self.app.db.persons[:1] or [dict(rank="ส.อ.", name="สมชาย", surname="ใจดี", house="99", moo="5", tambon="ตัวอย่าง",
+                                               amphoe=st.get("amphoe", "ตัวอย่าง"), province=st.get("province", "ตัวอย่าง"))]
+        EnvEditor(self.app, st, rows[0])
 
     def tpl_collect(self):
         out = {k: dict(v) for k, v in (self.app.st.get("tpl", {}) or {}).items()}     # ของเดิมที่ยังไม่ได้เปิดดู คงไว้
@@ -326,6 +456,8 @@ class SettingsWin(Page):
         kind = self.tpl_kindkey()
         self.tpl_vars.pop(kind, None)
         self.app.st.setdefault("tpl", {}).pop(kind, None)
+        if kind == "env":
+            self.app.st.pop("env_adj", None)
         self.tpl_build()
 
     def tpl_preview(self):

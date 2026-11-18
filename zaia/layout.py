@@ -544,32 +544,68 @@ def build_env(ctx):
     gr = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "garuda.png")
     if not os.path.exists(gr):
         gr = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "garuda.png")
+    adj = st.get("env_adj") or {}
+
+    def A(name):                                                 # ตำแหน่ง/ขนาดที่ผู้ใช้จัดเอง: (เลื่อนซ้ายขวา มม., เลื่อนบนล่าง มม., ขนาด x)
+        a = list(adj.get(name) or []) + [0, 0, 100][len(adj.get(name) or []):]
+        return _num(a[0], 0), _num(a[1], 0), max(0.3, _num(a[2], 100) / 100.0)
     for p in ctx.persons:
         pg = Page(g["w"], g["h"])
+        pg.tags = []
+
+        def tag(name):
+            pg.tags += [name] * (len(pg.ops) - len(pg.tags))
         if o["b_fold"]:
             for fy in (99.0, 198.0):                             # เส้นประรอยพับสาม
                 _ln(pg, 4, fy, g["w"] - 4, fy, 0.15, True)
+        tag("fold")
         sx = 14
         if o["b_garuda"] and os.path.exists(gr):                 # ตราครุฑมุมซ้ายบน สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
             gh = _num(o["gh"], 25)
             gw = gh * 253 / 199
-            pg.ops.append(("img", gr, 14, y0 + 10, gw, gh))
+            ox, oy, sc = A("garuda")
+            pg.ops.append(("img", gr, 14 + ox, y0 + 10 + oy, gw * sc, gh * sc))
             sx = 14 + gw + 3
+        tag("garuda")
+        ox, oy, sc = A("sender")
         for i, tx in enumerate(snd):
-            _t(pg, sx, y0 + 10 + i * 6.4, 110, 6.4, tx, "l", 16, False, "s")
+            _t(pg, sx + ox, y0 + 10 + oy + i * 6.4 * sc, 110, 6.4 * sc, tx, "l", 16 * sc, False, "s")
+        tag("sender")
         if st.get("env_no"):
-            _t(pg, 14, y0 + 42, 90, 7, "ที่  %s" % st["env_no"], "l", 16, False, "n")
+            ox, oy, sc = A("no")
+            _t(pg, 14 + ox, y0 + 42 + oy, 90, 7 * sc, "ที่  %s" % st["env_no"], "l", 16 * sc, False, "n")
+        tag("no")
         am, pv = _p(p, "amphoe") or st.get("amphoe", ""), _p(p, "province") or st.get("province", "")
         z = core.zip_lookup(pv, am, _p(p, "tambon"))
         name = ("%s %s  %s" % (_p(p, "rank"), _p(p, "name"), _p(p, "surname"))).replace("  ", " ").strip()
-        rx, ry, rh = 88, y0 + 52, 9.5                             # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
-        _t(pg, rx, ry, 16, rh, o["t_dear"], "l", 18, False, "e")
+        ox, oy, sc = A("recip")
+        rx, ry, rh = 88 + ox, y0 + 52 + oy, 9.5 * sc              # "เรียน" ยื่นออกทางซ้าย ชื่อกับที่อยู่ชิดแนวเดียวกัน
+        _t(pg, rx, ry, 16, rh, o["t_dear"], "l", 18 * sc, False, "e")
         rows = [name, "บ้านเลขที่ %s หมู่ที่ %s ตำบล%s" % (_p(p, "house"), _p(p, "moo"), _p(p, "tambon")),
                 "อำเภอ%s จังหวัด%s" % (am, pv), z]
         for i, tx in enumerate(rows):
-            _t(pg, rx + 16, ry + i * rh, 105, rh, tx, "l", 18, False, "r%d" % (i == 3))
+            _t(pg, rx + 16, ry + i * rh, 105, rh, tx, "l", 18 * sc, False, "r%d" % (i == 3))
+        tag("recip")
         pages.append(pg)
     return pages
+
+
+ENV_ITEMS = (("garuda", "ตราครุฑ"), ("sender", "ผู้ส่ง (หน่วยสัสดี/ที่อยู่)"), ("no", "ที่ (เลขหนังสือ)"), ("recip", "ผู้รับ (เรียน/ชื่อ/ที่อยู่)"))
+
+
+def env_boxes(page):
+    """กรอบ (x1,y1,x2,y2 มม.) ของแต่ละชิ้นในหน้าซอง ใช้ในหน้าจัดวางอิสระ"""
+    out = {}
+    for op, tg in zip(page.ops, getattr(page, "tags", [])):
+        if op[0] == "img":
+            b = (op[2], op[3], op[2] + op[4], op[3] + op[5])
+        elif op[0] == "text":
+            b = (op[1], op[2], op[1] + op[3], op[2] + op[4])
+        else:
+            continue
+        o = out.get(tg)
+        out[tg] = b if not o else (min(o[0], b[0]), min(o[1], b[1]), max(o[2], b[2]), max(o[3], b[3]))
+    return out
 
 
 def build(kind, persons, st, ptype, tambon, level):
