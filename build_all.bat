@@ -8,7 +8,8 @@ echo ============================================================
 
 rem ---- 1) Python 3.9+ with tkinter
 set "PY="
-where py >nul 2>nul && set "PY=py -3"
+where py >nul 2>nul && py -3.12 -c "import tkinter" >nul 2>nul && set "PY=py -3.12"
+if not defined PY ( where py >nul 2>nul && set "PY=py -3" )
 if not defined PY ( where python >nul 2>nul && set "PY=python" )
 if not defined PY goto :install_python
 %PY% -c "import sys,tkinter; sys.exit(0 if sys.version_info>=(3,9) else 1)" >nul 2>nul
@@ -31,6 +32,13 @@ pause & exit /b 0
 echo [1/6] Python OK: & %PY% --version
 
 rem ---- 2) virtual environment + packages
+if exist ".venv\Scripts\python.exe" (
+  ".venv\Scripts\python.exe" -c "import sys" >nul 2>nul
+  if errorlevel 1 (
+    echo [2/6] Old .venv is broken ^(Python was moved/removed^). Recreating...
+    rmdir /s /q .venv
+  )
+)
 if not exist ".venv\Scripts\python.exe" (
   echo [2/6] Creating virtual environment...
   %PY% -m venv .venv || goto :fail
