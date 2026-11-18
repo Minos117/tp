@@ -36,10 +36,16 @@ _LOG_KEYS = (("err", ("ผิดพลาด", "Error", "error", "ไม่ส�
              ("info", ("→", "มีรุ่นใหม่", "ไฟล์", "รุ่น ")))
 
 
+def _thai_font():
+    """ฟอนต์ที่มีอักษรไทยในตัว (ไม่ต้องพึ่งฟอนต์สำรอง ตัวหนังสือจึงไม่ปนหลายแบบ)"""
+    fams = set(tkfont.families())
+    return next((f for f in ("Leelawadee UI", "Tahoma", "Segoe UI", "Loma") if f in fams), "TkDefaultFont")
+
+
 def make_log(parent, **kw):
     """ช่อง log พื้นดำ ข้อความหลายสีแบบคอนโซล Python"""
     t = tk.Text(parent, bg=LOG_BG, fg=LOG_FG, insertbackground="white", relief="flat", padx=10, pady=8,
-                font=("Consolas", 11), state="disabled", wrap="word", **kw)
+                font=(_thai_font(), 11), state="disabled", wrap="word", **kw)
     for tag, col in (("ts", "#7A7A7A"), ("err", "#FF5C57"), ("warn", "#F3F99D"), ("ok", "#5AF78E"), ("info", "#57C7FF"), ("head", "#FF6AC1")):
         t.tag_config(tag, foreground=col)
     return t
@@ -806,7 +812,7 @@ class RecordWin(Page):
         fam = app.ui_font
         self.F = tkfont.Font(family=fam, size=11)                    # ฟอนต์ปรับขนาดอัตโนมัติตามขนาดหน้าต่าง
         self.FB = tkfont.Font(family=fam, size=13, weight="bold")
-        self.FL = tkfont.Font(family="Tahoma", size=11)
+        self.FL = tkfont.Font(family=fam, size=12)
         self.FH = tkfont.Font(family=fam, size=18, weight="bold")
         stl = ttk.Style()
         for nm in ("Rec.TLabel", "Rec.TCheckbutton", "Rec.TRadiobutton"):
@@ -830,7 +836,8 @@ class RecordWin(Page):
         ttk.Checkbutton(left, text="เฉพาะที่ยังไม่บันทึก", variable=self.only, command=self.refill, style="Rec.TCheckbutton").pack(anchor="w")
         fr = ttk.Frame(left)
         fr.pack(fill="both", expand=True)
-        self.lb = tk.Listbox(fr, width=34, exportselection=False, font=self.FL, activestyle="none")
+        self.lb = tk.Listbox(fr, width=34, exportselection=False, font=self.FL, activestyle="none", bg="white", fg="#1B2A4A", selectbackground=luna.BLUE_SEL, selectforeground="white",
+                           highlightthickness=1, highlightbackground=luna.LINE_D, relief="flat", borderwidth=0)
         sc = ttk.Scrollbar(fr, command=self.lb.yview)
         self.lb.config(yscrollcommand=sc.set)
         self.lb.pack(side="left", fill="both", expand=True)
@@ -874,7 +881,7 @@ class RecordWin(Page):
         pf = ttk.Frame(g)
         pf.grid(row=r, column=1, sticky="we")
         ttk.Entry(pf, textvariable=self.v["place"], width=14, font=self.F).pack(fill="x")
-        ttk.Button(pf, text="คลิก ใส่ที่อยู่ตามภูมิลำเนา", command=self.domicile, style="Rec.TButton").pack(anchor="w", pady=3)
+        ttk.Button(pf, text="ใส่ตามภูมิลำเนา", command=self.domicile, style="Rec.TButton").pack(anchor="w", pady=3)
         r += 1
         ttk.Label(g, text="จังหวัด", style="Rec.TLabel").grid(row=r, column=0, sticky="w", pady=6)
         self.cp = ttk.Combobox(g, textvariable=self.v["province"], values=sorted(GEO), width=18, font=self.F)
@@ -929,7 +936,9 @@ class RecordWin(Page):
         self.view = base
         self.lb.delete(0, "end")
         for p in base:
-            self.lb.insert("end", "%s %s%s %s  (ม.%s ต.%s)" % ("✓" if self.db.filled(p) else "  ", p["rank"], p["name"], p["surname"], p["moo"], p["tambon"]))
+            self.lb.insert("end", " %s%s %s  ม.%s ต.%s" % (p["rank"], p["name"], p["surname"], p["moo"], p["tambon"]))
+            if self.db.filled(p):                      # บันทึกแล้ว = ตัวอักษรสีเขียว (ไม่ใช้สัญลักษณ์ ✓ ที่ฟอนต์ไทยไม่มี)
+                self.lb.itemconfig("end", fg="#1B7F3B")
         done = sum(1 for p in self.db.persons if self.db.filled(p))
         self.prog.config(text="บันทึกแล้ว %d / %d คน" % (done, len(self.db.persons)))
 
