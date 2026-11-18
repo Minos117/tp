@@ -1305,7 +1305,7 @@ class TitleBar(tk.Canvas):
 
     def __init__(self, parent, font):
         super().__init__(parent, height=62, highlightthickness=0, bd=0)
-        self.font, self.text = font, ""
+        self.font, self.text, self.H = font, "", 62
         self.bind("<Configure>", lambda e: self.draw())
 
     def config(self, **kw):
@@ -1317,14 +1317,14 @@ class TitleBar(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        w, h = max(1, self.winfo_width()), 62
+        w, h = max(1, self.winfo_width()), self.H
         step = 4
         for x in range(0, w, step):
             t = x / w
             c = tuple(int(BAR_L[i] + (BAR_R[i] - BAR_L[i]) * t) for i in range(3))
             self.create_rectangle(x, 0, x + step, h, fill="#%02x%02x%02x" % c, outline="")
         self.create_rectangle(0, h - 3, w, h, fill="#3C9A3C", outline="")          # เส้นเขียวใต้แถบ
-        self.create_text(22, h / 2 - 1, text=self.text, anchor="w", fill="white", font=self.font)
+        self.create_text(18, h / 2 - 1, text=self.text, anchor="w", fill="white", font=(self.font[0], 16 if h < 50 else self.font[1], "bold"))
 
 
 def asset(name):
@@ -1385,14 +1385,28 @@ class HomePage(Page):
         row.pack(fill="x")
         stats = [("รายชื่อทั้งหมด", str(n), "คน", NAVY), ("บันทึกผลแล้ว", str(done), "จาก %d คน" % n, GREEN),
                  ("รอเขียนกลับ Excel", str(db.dirty_count()), "คน", "#D98A00"), ("พิมพ์บัญชีตรวจสอบแล้ว", str(printed), "คน", ACCENT)]
+        cards = []
         for i, (t, v, u, c) in enumerate(stats):
             row.columnconfigure(i, weight=1, uniform="s")
             f = tk.Frame(row, bg=CARD, highlightthickness=1, highlightbackground="#ACA899")
-            f.grid(row=0, column=i, sticky="nsew", padx=(0 if i == 0 else 10, 0))
+            cards.append(f)
             tk.Frame(f, bg=c, height=5).pack(fill="x")
             tk.Label(f, text=t, bg=CARD, fg=MUTED, font=(fam, 11)).pack(anchor="w", padx=16, pady=(12, 0))
             tk.Label(f, text=v, bg=CARD, fg=c, font=(fam, 28, "bold")).pack(anchor="w", padx=16)
             tk.Label(f, text=u, bg=CARD, fg=MUTED, font=(fam, 10)).pack(anchor="w", padx=16, pady=(0, 10))
+        state = {"cols": 0}
+
+        def reflow(e=None):
+            cols = 4 if row.winfo_width() >= 820 else 2           # จอแคบ: การ์ดสถิติเรียง 2x2
+            if cols == state["cols"]:
+                return
+            state["cols"] = cols
+            for j in range(4):
+                row.columnconfigure(j, weight=1 if j < cols else 0, uniform="s" if j < cols else "")
+            for j, f in enumerate(cards):
+                f.grid(row=j // cols, column=j % cols, sticky="nsew", padx=(0 if j % cols == 0 else 8, 0), pady=(0, 8))
+        row.bind("<Configure>", reflow)
+        reflow()
         pb = ttk.Progressbar(inner, maximum=max(1, n), value=done, style="Green.Horizontal.TProgressbar")
         pb.pack(fill="x", pady=(12, 4))
         src = db.source.get("path", "")
@@ -1425,10 +1439,10 @@ def _progress_table(self, db, fam):
     cols = ("all", "done", "left", "pct")
     tv = ttk.Treeview(box, columns=cols, height=12, selectmode="browse")
     tv.heading("#0", text="ประเภท / ตำบล / หมู่")
-    for c, t, w in (("all", "ทั้งหมด", 90), ("done", "ดำเนินการแล้ว", 120), ("left", "ยังไม่ดำเนินการ (คงเหลือ)", 190), ("pct", "ร้อยละ", 80)):
+    for c, t, w in (("all", "ทั้งหมด", 70), ("done", "ดำเนินการแล้ว", 110), ("left", "คงเหลือ", 80), ("pct", "ร้อยละ", 64)):
         tv.heading(c, text=t)
-        tv.column(c, width=w, anchor="e")
-    tv.column("#0", width=300)
+        tv.column(c, width=w, minwidth=w, anchor="e", stretch=False)
+    tv.column("#0", width=200, minwidth=150, stretch=True)
     tv.tag_configure("ptype", background="#D6E3F8", font=(fam, 11, "bold"))
     tv.tag_configure("tam", background="#F7F5EA")
     tv.tag_configure("zero", foreground="#B42318")
@@ -1513,7 +1527,9 @@ class App(tk.Tk):
         self.news.place(relx=1.0, x=-18, rely=0.5, anchor="e")
         self.content = tk.Frame(main, bg=BG)
         self.content.pack(fill="both", expand=True, padx=24, pady=(16, 16))
+        self._sidebtns, self._compact = [], None
         self.build_side()
+        self.bind("<Configure>", self._on_resize)
         self.cur = None
         self.navbtn = {}
         self.nav("home")
@@ -1558,7 +1574,9 @@ class App(tk.Tk):
         head.pack(fill="x", pady=(22, 18), padx=18)
         if self._logo_big:
             tk.Label(head, image=self._logo_big, bg=SIDE).pack(side="left")
-        tk.Label(head, text="ZAIA\nPrepare Personal", bg=SIDE, fg="white", font=(f, 13, "bold"), justify="left").pack(side="left", padx=10)
+        self._headtxt = tk.Label(head, text="ZAIA\nPrepare Personal", bg=SIDE, fg="white", font=(f, 13, "bold"), justify="left")
+        self._headtxt.pack(side="left", padx=10)
+        self._head = head
         self.navbtn = {}
         for key, txt in (("home", "หน้าแรก"), ("import", "1  นำเข้าข้อมูล"), ("form", "2  แบบพิมพ์รายบุคคล / ซอง"),
                          ("send", "3  ส่งผู้ใหญ่บ้านตรวจสอบ"), ("record", "4  บันทึกผลการตรวจสอบ"), ("reg", "5  พิมพ์บัญชีตรวจสอบสภาพ"),
@@ -1577,9 +1595,28 @@ class App(tk.Tk):
         self.navbtn["update"] = self.side_btn("ตรวจสอบอัปเดต", lambda: self.nav("update"))
         tk.Label(self.side, text="รุ่น %s" % APP_VER, bg=SIDE, fg="#CFE0FF", font=(f, 10)).pack(side="bottom", pady=12)
 
+    def _on_resize(self, e):
+        """จอเล็ก (เช่นแท็บเล็ต 10 นิ้ว ที่ขยาย 150%): ย่อแถบเมนูซ้ายและช่องไฟ ให้เนื้อหามีที่มากขึ้น"""
+        if e.widget is not self:
+            return
+        c = e.width < 1000
+        if c == self._compact:
+            return
+        self._compact = c
+        self.side.config(width=224 if c else 270)
+        for b in self._sidebtns:
+            b.config(font=(self.ui_font, 11 if c else 12), padx=14 if c else 22, pady=4 if c else 11)
+        self._headtxt.config(font=(self.ui_font, 11 if c else 13, "bold"))
+        self._head.pack_configure(pady=(8, 6) if c else (22, 18), padx=10 if c else 18)
+        self.h1.config(height=46 if c else 62)
+        self.h1.H = 46 if c else 62
+        self.h1.draw()
+        self.content.pack_configure(padx=10 if c else 24, pady=8 if c else 16)
+
     def side_btn(self, text, cmd):
         b = tk.Label(self.side, text=text, bg=SIDE, fg="#EAF1FF", font=(self.ui_font, 12), anchor="w", padx=22, pady=11, cursor="hand2")
         b.pack(fill="x")
+        self._sidebtns.append(b)
         b.bind("<Enter>", lambda e: b.config(bg=SIDE_HOVER) if b.cget("bg") != SIDE_ACT else None)
         b.bind("<Leave>", lambda e: b.config(bg=SIDE) if b.cget("bg") != SIDE_ACT else None)
         if cmd:
