@@ -107,6 +107,16 @@ def _sign_block(pg, ctx, x0, x1, y, Lh, pt):
     return len(lines)
 
 
+def _tag_h(ctx, Lh):
+    """หน้า 2 เป็นต้นไป: เว้น 1 บรรทัดบนสุดไว้ใส่ชื่อตำบลมุมขวา (ปิดได้ที่ตั้งค่า show_tambon_p2)"""
+    t = ctx.tambon
+    return Lh if (ctx.st.get("show_tambon_p2", True) and t and t != "ทุกตำบล") else 0.0
+
+
+def _tag(pg, ctx, x1, y, Lh, pt):
+    _t(pg, x1 - 60, y, 60, Lh, "ตำบล" + ctx.tambon, "r", pt, False)
+
+
 def _p(p, k):
     return str(p.get(k, "") or "")
 
@@ -132,7 +142,8 @@ def build_reg(ctx):
     h_tab = hdr_lines * Lh
     avail = g["h"] - g["mt"] - g["mb"]
     ph = 3 * Lh
-    sizes = paginate(len(ctx.persons), ph, avail - h_title - h_tab, avail - h_tab, 5 * Lh if ctx.level == "อำเภอ" else 3 * Lh, 5, 7)   # เทมเพลต: หน้าแรก 5 คน หน้าถัดไป 7 คน ไม่ซ้ำหัวตาราง
+    th = _tag_h(ctx, Lh)
+    sizes = paginate(len(ctx.persons), ph, avail - h_title - h_tab, avail - h_tab - th, 5 * Lh if ctx.level == "อำเภอ" else 3 * Lh, 5, 7)   # เทมเพลต: หน้าแรก 5 คน หน้าถัดไป 7 คน ไม่ซ้ำหัวตาราง
     pages, idx = [], 0
     for pn, k in enumerate(sizes):
         pg = Page(g["w"], g["h"])
@@ -160,6 +171,9 @@ def build_reg(ctx):
                     _t(pg, xs[8], yy, cw[8] + cw[9], Lh, d, "c", pt)
                     _ln(pg, xs[8], yy + Lh - 0.6, xs[10], yy + Lh - 0.6, 0.2, True)
             y += 4 * Lh
+        elif th:
+            _tag(pg, ctx, xs[14], y, Lh, pt)
+            y += th
         # หัวตาราง
         yt = y
         yb = y + h_tab
@@ -252,7 +266,8 @@ def build_table(ctx):
     h_title = 3 * Lh
     avail = g["h"] - g["mt"] - g["mb"]
     block = {"อำเภอ": 5, "กำนัน": 3, "จังหวัด": 1}[ctx.level] * Lh
-    sizes = paginate(len(ctx.persons), ph, avail - h_title - h_tab - (ph if send else 0), avail - h_tab, block)
+    th = 0.0 if send else _tag_h(ctx, Lh)
+    sizes = paginate(len(ctx.persons), ph, avail - h_title - h_tab - (ph if send else 0), avail - h_tab - th, block)
     pages, idx = [], 0
     for pn, k in enumerate(sizes):
         pg = Page(g["w"], g["h"])
@@ -262,6 +277,9 @@ def build_table(ctx):
             y += Lh
             _t(pg, xs[0], y, tw, Lh, "อำเภอ%s   จังหวัด%s" % (st.get("_amphoe", ""), st.get("_province", "")), "c", pt, True)
             y += 2 * Lh
+        elif th and not send:
+            _tag(pg, ctx, xs[9], y, Lh, pt)
+            y += th
         yt, yb = y, y + h_tab
         _ln(pg, xs[0], yt, xs[9], yt, 0.35)
         _ln(pg, xs[0], yb, xs[9], yb, 0.35)
@@ -397,14 +415,14 @@ def build_form(ctx):
             lab(9, 9, r, "จังหวัด", "l"); val(10, 12, r)
             lab(13, 13, r, "รหัสไปรษณีย์", "c"); val(14, 14, r)
 
-        box(0, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
+        box(1, 12, "ทำงาน"); lab(2, 4, 12, "ทำงานอยู่ที่", "r"); val(5, 14, 12)
         lab(0, 4, 13, "     - รับจ้างทั่วไปโปรดแจ้งรายละเอียด", "l", False); addr(13)
-        box(0, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
+        box(1, 14, "ศึกษา"); lab(2, 4, 14, "ศึกษาอยู่ที่", "r"); val(5, 8, 14)
         lab(9, 9, 14, "คณะ", "c"); val(10, 12, 14); lab(12, 13, 14, "ชั้นปีที่", "r"); val(14, 14, 14)
         addr(15)
-        box(0, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
+        box(1, 16, "ว่างงาน"); lab(2, 4, 16, "อาศัยอยู่ที่", "r"); val(5, 14, 16)
         addr(17)
-        box(0, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
+        box(1, 18, "อื่นๆ"); lab(2, 4, 18, "ระบุสถานที่", "r"); val(5, 14, 18)
         lab(0, 3, 19, "     - เช่น ตาย", "l", False); lab(4, 4, 19, "ที่อยู่", "l"); addr(19)
         lab(1, 14, 20, "4  เบอร์โทรศัพท์ที่สามารถติดต่อได้ (กรณีกองทัพบกเรียกพลฯ เพื่อฝึกหรือเพื่อตรวจสอบ)")
         for r, tx in ((21, "เบอร์โทรศัพท์ เจ้าตัว"), (22, "เบอร์โทรศัพท์ บิดา มารดา ผู้ปกครอง"), (23, "เบอร์โทรศัพท์ ที่ทำงาน")):
@@ -439,8 +457,10 @@ def build_env(ctx):
         pg = Page(g["w"], g["h"])
         sx = 10
         if os.path.exists(gr):                                   # ตราครุฑมุมซ้ายบน (ตามเทมเพลต) ข้อความผู้ส่งอยู่ถัดไปทางขวา
-            pg.ops.append(("img", gr, 10, 8, 17.5, 17.5 * 199 / 253))
-            sx = 30
+            gh = 25.0                                            # สูงเท่าบล็อกข้อความผู้ส่ง 4 บรรทัด
+            gw = gh * 253 / 199
+            pg.ops.append(("img", gr, 10, 8, gw, gh))
+            sx = 10 + gw + 3
         for i, tx in enumerate(snd):
             _t(pg, sx, 8 + i * 6.4, 100, 6.4, tx, "l", 16, False, "s")
         if st.get("env_no"):

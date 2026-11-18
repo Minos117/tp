@@ -117,7 +117,7 @@ DEFAULT_SETTINGS = {
     "sign_kamnan": ["ได้ตรวจถูกต้องแล้ว", "", "           กำนันตำบล{ตำบล}"],
     "sig_image": "", "sig_level": "อำเภอ", "sig_w": 32.0, "sig_dx": 0.0, "sig_dy": 0.0,
     "update_url": "",
-    "unit_name": "หน่วยสัสดีอำเภอ", "unit_addr": "ที่ว่าการอำเภอ", "unit_amphoe": "", "unit_province": "", "unit_zip": "",
+    "show_tambon_p2": True, "env_rot": True, "unit_name": "หน่วยสัสดีอำเภอ", "unit_addr": "ที่ว่าการอำเภอ", "unit_amphoe": "", "unit_province": "", "unit_zip": "",
     "sad_tel": "", "deadline": "", "env_no": "",
 }
 

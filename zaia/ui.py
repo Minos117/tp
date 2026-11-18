@@ -133,6 +133,9 @@ class SettingsWin(Page):
             ttk.Label(f1, text=lab).grid(row=i, column=0, sticky="w", pady=5)
             self.v[k] = tk.StringVar(value=str(st.get(k, "")))
             ttk.Entry(f1, textvariable=self.v[k], width=50).grid(row=i, column=1, pady=5, padx=8)
+        self.tam_p2 = tk.BooleanVar(value=bool(st.get("show_tambon_p2", True)))
+        ttk.Checkbutton(f1, text="พิมพ์ชื่อตำบลมุมขวาบนของหน้า 2 เป็นต้นไป (บัญชีตรวจสอบสภาพ / บัญชีสรุป)", variable=self.tam_p2).grid(
+            row=len(rows) + 1, column=0, columnspan=2, sticky="w", pady=4)
         self.backup = tk.BooleanVar(value=st.get("backup", True))
         ttk.Checkbutton(f1, text="สำรองไฟล์ Excel ต้นฉบับอัตโนมัติก่อนเขียนกลับ", variable=self.backup).grid(
             row=len(rows), column=0, columnspan=2, sticky="w", pady=8)
@@ -300,6 +303,7 @@ class SettingsWin(Page):
             st[k] = self.lines[lv]
         st["backup"] = self.backup.get()
         st["env_rot"] = self.env_rot.get()
+        st["show_tambon_p2"] = self.tam_p2.get()
         st["sig_image"], st["sig_level"] = self.sig_path.get(), self.sig_level.get()
         st["sig_w"], st["sig_dx"], st["sig_dy"] = round(self.sig_w.get(), 1), round(self.dx, 2), round(self.dy, 2)
         core.save_settings(st)
@@ -759,8 +763,12 @@ class PrintWin(Page):
         self.info.pack(anchor="w")
         bf = ttk.Frame(self, padding=10)
         bf.pack(fill="x")
-        for txt, cmd, stl in (("ดูตัวอย่าง", self.preview, "TButton"), ("พิมพ์ที่เลือก (1 ชุด เรียงหมู่)", lambda: self.go("sel"), "Accent.TButton"),
-                              ("พิมพ์ทีละตำบล", lambda: self.go("tam"), "Accent.TButton"), ("พิมพ์ทีละหมู่", lambda: self.go("moo"), "Accent.TButton")):
+        btns = [("ดูตัวอย่าง", self.preview, "TButton")]
+        if kind == "send":
+            btns += [("พิมพ์หมู่ที่เลือก", lambda: self.go("sel"), "Accent.TButton"), ("พิมพ์ทีละหมู่", lambda: self.go("moo"), "Accent.TButton")]
+        else:
+            btns += [("พิมพ์ที่เลือก (1 ชุด เรียงหมู่)", lambda: self.go("sel"), "Accent.TButton"), ("พิมพ์ทีละตำบล", lambda: self.go("tam"), "Accent.TButton")]
+        for txt, cmd, stl in btns:
             ttk.Button(bf, text=txt, command=cmd, style=stl).pack(side="left", padx=3)
         ttk.Button(bf, text="ยกเลิก (Esc)", command=self.stop).pack(side="right", padx=3)
         ttk.Button(bf, text="ล้างสถานะพิมพ์แล้ว", command=self.reset_marks).pack(side="right", padx=3)
