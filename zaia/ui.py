@@ -698,9 +698,48 @@ class ImportWin(Page):
         ttk.Button(b, text="รีเฟรชตัวอย่าง", command=self.preview).pack(side="left")
         ttk.Button(b, text="นำเข้า", style="Accent.TButton", command=self.do_import).pack(side="right")
         ttk.Button(b, text="ยกเลิก", command=self.destroy).pack(side="right", padx=6)
+        ttk.Button(b, text="ล้างค่าที่จำไว้", command=self.forget).pack(side="left", padx=10)
         self.msg = ttk.Label(b, text="")
         self.msg.pack(side="left", padx=10)
+        self._restoring = False
+        self.restore()
 
+    # ---- จำค่านำเข้า/ข้อมูลที่ดึงค้างไว้ (ออกจากหน้านี้หรือปิดโปรแกรมแล้วกลับมา ไม่ต้องเลือกใหม่)
+    def save_draft(self):
+        if self._restoring or not self.path.get() or not getattr(self, "mvars", None):
+            return
+        self.app.st["import_draft"] = {"path": self.path.get(), "sheet": self.sheet.get(), "hrow": self.hrow.get(), "srow": self.srow.get(),
+                                       "erow": self.erow.get(), "map": {k: v.get() for k, v in self.mvars.items()}}
+        core.save_settings(self.app.st)
+
+    def forget(self):
+        self.app.st.pop("import_draft", None)
+        core.save_settings(self.app.st)
+        self.msg.config(text="ล้างค่าที่จำไว้แล้ว (ครั้งต่อไปเริ่มใหม่)")
+
+    def restore(self):
+        d = self.app.st.get("import_draft")
+        if not d:
+            s = getattr(self.app.db, "source", None) or {}
+            if not s.get("path"):
+                return
+            d = {"path": s["path"], "sheet": s.get("sheet", ""), "hrow": s.get("header_row", 1), "srow": s.get("start", 2),
+                 "erow": s.get("end", 0), "map": None, "colmap": s.get("mapping")}
+        if not os.path.exists(d.get("path", "")):
+            return
+        self._restoring = True
+        try:
+            sh = core.list_sheets(d["path"])
+            self.path.set(d["path"])
+            self.cb["values"] = sh
+            self.sheet.set(d["sheet"] if d.get("sheet") in sh else sh[0])
+            self.hrow.set(int(d.get("hrow", 1)))
+            self.load_headers(saved=d)
+            self.msg.config(text="เรียกค่าที่ตั้งไว้ล่าสุดกลับมาแล้ว — " + self.msg.cget("text"))
+        except Exception:
+            pass
+        finally:
+            self._restoring = False
     def _resize(self, e):
         """ขยาย/ย่อหน้าต่างแล้วจัดช่องจับคู่ให้พอดีความกว้าง (2-4 คอลัมน์)"""
         self.cv.itemconfigure(self._win, width=e.width)
@@ -732,7 +771,7 @@ class ImportWin(Page):
         self.sheet.set(guess)
         self.load_headers()
 
-    def load_headers(self):
+    def load_headers(self, saved=None):
         try:
             rows = core.read_rows(self.path.get(), self.sheet.get(), self.hrow.get(), self.hrow.get())
         except Exception as e:
@@ -754,6 +793,16 @@ class ImportWin(Page):
             self.mvars[k] = v
             self.mrows[k] = (lab, cb)
         self._grid()
+        if saved:                                    # เรียกค่าที่จำไว้ (การจับคู่คอลัมน์ + แถวเริ่ม/จบ)
+            for k, v in (saved.get("map") or {}).items():
+                if k in self.mvars and v in self.opts:
+                    self.mvars[k].set(v)
+            for k, c in (saved.get("colmap") or {}).items():
+                if k in self.mvars and isinstance(c, int) and 0 < c < len(self.opts):
+                    self.mvars[k].set(self.opts[c])
+            self.srow.set(int(saved.get("srow", self.hrow.get() + 1)))
+            self.erow.set(int(saved.get("erow", 0)))
+            return self.preview()
         self.srow.set(self.hrow.get() + 1)
         self.find_last()
 
@@ -790,6 +839,7 @@ class ImportWin(Page):
             self.tv.insert("", "end", values=[r] + [cells[m[k] - 1] if m[k] - 1 < len(cells) else "" for k in keys])
         miss = [core.FIELDS[k][0] for k in core.REQUIRED if k not in m]
         self.msg.config(text=("ยังไม่ได้เลือก: " + ", ".join(miss)) if miss else "จะนำเข้าแถว %d–%d" % (self.srow.get(), self.erow.get()))
+        self.save_draft()
 
     def do_import(self):
         m = self.mapping()
